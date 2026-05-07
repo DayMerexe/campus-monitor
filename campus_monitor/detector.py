@@ -46,6 +46,13 @@ def detect_loop():
     fps_timer = time.time()
     last_db_write = time.time()
 
+    # 报警防抖参数
+    ALARM_CONFIRM = 3       # 连续确认帧数
+    ALARM_LOCK = 3.0        # 状态切换后锁定秒数
+    consecutive_over = 0
+    consecutive_under = 0
+    last_state_change = 0.0
+
     while True:
         try:
             r = requests.get(ESP32_CAM_URL, stream=True, timeout=10)
@@ -93,25 +100,45 @@ def detect_loop():
                 count = sum(1 for box in results[0].boxes
                             if int(box.cls[0]) == PERSON_CLASS_ID)
 
-                prev_alarm = alarm_active
                 person_count = count
-                alarm_active = count > ALARM_THRESHOLD
+                now = time.time()
+                locked = (now - last_state_change) < ALARM_LOCK
 
-                # 报警事件管理
-                if alarm_active:
-                    if count > alarm_max_count:
-                        alarm_max_count = count
-                    if not prev_alarm:
-                        # 报警开始
-                        alarm_event_id = start_alarm(count)
-                        alarm_max_count = count
-                        print(f"🚨 报警触发！人数: {count}")
-                elif prev_alarm and alarm_event_id is not None:
-                    # 报警结束
-                    end_alarm(alarm_event_id, alarm_max_count)
-                    print(f"✅ 报警解除。峰值: {alarm_max_count}")
-                    alarm_event_id = None
-                    alarm_max_count = 0
+                # 报警防抖：连续确认 + 锁定保护
+                if not locked:
+                    if not alarm_active:
+                        if count > ALARM_THRESHOLD:
+                            consecutive_over += 1
+                            consecutive_under = 0
+                            if consecutive_over >= ALARM_CONFIRM:
+                                alarm_active = True
+                                last_state_change = now
+                                consecutive_over = 0
+                                alarm_event_id = start_alarm(count)
+                                alarm_max_count = count
+                                print(f"🚨 报警触发！人数: {count}")
+                        else:
+                            consecutive_over = 0
+                    else:
+                        if count <= ALARM_THRESHOLD:
+                            consecutive_under += 1
+                            consecutive_over = 0
+                            if consecutive_under >= ALARM_CONFIRM:
+                                alarm_active = False
+                                last_state_change = now
+                                consecutive_under = 0
+                                end_alarm(alarm_event_id, alarm_max_count)
+                                print(f"✅ 报警解除。峰值: {alarm_max_count}")
+                                alarm_event_id = None
+                                alarm_max_count = 0
+                        else:
+                            consecutive_under = 0
+                            if count > alarm_max_count:
+                                alarm_max_count = count
+
+                # 锁定期间不切换状态，只跟踪峰值
+                if alarm_active and count > alarm_max_count:
+                    alarm_max_count = count
 
                 # 画框
                 annotated = frame.copy()
