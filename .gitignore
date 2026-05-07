@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Keil / ARM
+Listings/
+Objects/
+*.uvguix.*
+*.uvoptx
+*.uvprojx
+*.scvd
+*.dbgconf
+*.dep
+*.crf
+*.d
+*.o
+*.axf
+*.htm
+*.lnp
+*.lst
+JLinkLog.txt
+*.iex
+
+# Arduino
+**/build/
+
+# Large models
+*.pt
+*.pth
+
+# OS
+.DS_Store
+Thumbs.db
+*.tmp

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>校园人流量监测系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0f1923; color: #fff; min-height: 100vh; display: flex; justify-content: center; align-items: center; }
+        .container { max-width: 900px; width: 100%; padding: 20px; }
+        h1 { text-align: center; font-size: 24px; margin-bottom: 20px; color: #00d4ff; }
+        .video-box { background: #1a2a3a; border-radius: 12px; overflow: hidden; border: 2px solid #2a3a4a; }
+        .video-box img { width: 100%; display: block; }
+        .status-bar { display: flex; justify-content: space-between; align-items: center; background: #1a2a3a; border-radius: 12px; padding: 20px; margin-top: 15px; border: 2px solid #2a3a4a; }
+        .status-item { text-align: center; flex: 1; }
+        .status-item .label { font-size: 14px; color: #8899aa; }
+        .status-item .value { font-size: 36px; font-weight: bold; margin-top: 5px; }
+        .status-item .value.count { color: #00d4ff; }
+        .status-item .value.alarm { color: #ff4444; }
+        .status-item .value.safe { color: #44ff44; }
+        .threshold-box { display: flex; gap: 10px; align-items: center; margin-top: 15px; background: #1a2a3a; border-radius: 12px; padding: 15px 20px; border: 2px solid #2a3a4a; justify-content: center; }
+        .threshold-box input { padding: 8px 12px; border-radius: 6px; border: 1px solid #2a3a4a; background: #0f1923; color: #fff; font-size: 16px; width: 80px; text-align: center; }
+        .threshold-box button { padding: 8px 20px; border-radius: 6px; border: none; background: #00d4ff; color: #0f1923; font-weight: bold; cursor: pointer; font-size: 14px; }
+        .threshold-box button:hover { background: #00b8e6; }
+        .alarm-banner { display: none; text-align: center; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 18px; margin-top: 10px; }
+        .alarm-banner.active { display: block; background: #ff4444; color: #fff; animation: blink 0.8s infinite; }
+        @keyframes blink { 50% { opacity: 0.5; } }
+        .fps { font-size: 13px; color: #667788; margin-top: 5px; }
+        .video-placeholder { width: 100%; aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center; background: #0a1520; color: #667788; font-size: 16px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🏫 校园人流量监测系统</h1>
+
+    <div class="video-box">
+        <img id="videoFeed" src="/video_feed" alt="视频流">
+    </div>
+
+    <div class="status-bar">
+        <div class="status-item">
+            <div class="label">当前人数</div>
+            <div class="value count" id="countDisplay">0</div>
+        </div>
+        <div class="status-item">
+            <div class="label">报警状态</div>
+            <div class="value safe" id="alarmDisplay">正常</div>
+        </div>
+        <div class="status-item">
+            <div class="label">帧率</div>
+            <div class="value count" id="fpsDisplay" style="font-size:24px;">0</div>
+        </div>
+    </div>
+
+    <div class="threshold-box">
+        <span>报警阈值：</span>
+        <input type="number" id="thresholdInput" value="5" min="1" max="100">
+        <button onclick="setThreshold()">设置</button>
+        <span style="margin-left:20px;">手动控制：</span>
+        <button onclick="manualAlarm('alarm_on')" style="background:#ff4444;">⚠ 报警</button>
+        <button onclick="manualAlarm('alarm_off')" style="background:#44ff44;">✅ 解除</button>
+    </div>
+
+    <div class="alarm-banner" id="alarmBanner">⚠️ 超过阈值！请疏散！</div>
+</div>
+
+<script>
+    function updateStatus() {
+        fetch('/status')
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('countDisplay').textContent = data.count;
+                document.getElementById('fpsDisplay').textContent = data.fps + ' FPS';
+
+                const alarmEl = document.getElementById('alarmDisplay');
+                const banner = document.getElementById('alarmBanner');
+                if (data.alarm) {
+                    alarmEl.textContent = '⚠️ 报警中';
+                    alarmEl.className = 'value alarm';
+                    banner.className = 'alarm-banner active';
+                } else {
+                    alarmEl.textContent = '✅ 正常';
+                    alarmEl.className = 'value safe';
+                    banner.className = 'alarm-banner';
+                }
+
+                document.getElementById('thresholdInput').value = data.threshold;
+            })
+            .catch(() => {});
+    }
+
+    function setThreshold() {
+        const val = parseInt(document.getElementById('thresholdInput').value);
+        if (isNaN(val) || val < 1) return alert('请输入有效数字');
+        fetch('/set_threshold', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ threshold: val })
+        }).then(r => r.json()).then(d => {
+            if (d.status === 'ok') alert('阈值已设置为 ' + d.threshold);
+        });
+    }
+
+    function manualAlarm(action) {
+        const btn = action === 'alarm_on'
+            ? document.querySelectorAll('button')[1]
+            : document.querySelectorAll('button')[2];
+        const origText = btn.textContent;
+        btn.textContent = '...';
+        btn.style.opacity = '0.5';
+        fetch('/control', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: action })
+        }).then(r => r.json()).then(d => {
+            btn.textContent = origText;
+            btn.style.opacity = '1';
+            if (d.status === 'ok') {
+                btn.textContent = '✓ 已发送';
+                setTimeout(() => { btn.textContent = origText; }, 800);
+            }
+        }).catch(() => {
+            btn.textContent = origText;
+            btn.style.opacity = '1';
+        });
+    }
+
+    setInterval(updateStatus, 1000);
+    updateStatus();
+</script>
+</body>
+</html>
