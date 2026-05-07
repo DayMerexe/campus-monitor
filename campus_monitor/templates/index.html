@@ -4,83 +4,269 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>校园人流量监测系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', sans-serif; background: #0f1923; color: #fff; min-height: 100vh; display: flex; justify-content: center; align-items: center; }
-        .container { max-width: 900px; width: 100%; padding: 20px; }
-        h1 { text-align: center; font-size: 24px; margin-bottom: 20px; color: #00d4ff; }
-        .video-box { background: #1a2a3a; border-radius: 12px; overflow: hidden; border: 2px solid #2a3a4a; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #0f1923; color: #fff;
+            min-height: 100vh;
+            display: flex; justify-content: center; align-items: flex-start;
+            padding-top: 20px;
+        }
+        .container { max-width: 1240px; width: 100%; padding: 20px; }
+
+        h1 {
+            text-align: center; font-size: 22px;
+            margin-bottom: 15px; color: #00d4ff;
+        }
+
+        /* 双栏主区域 */
+        .main-row { display: flex; gap: 15px; }
+
+        /* 左侧视频 */
+        .video-box {
+            flex: 0 0 640px;
+            background: #1a2a3a; border-radius: 10px; overflow: hidden;
+            border: 2px solid #2a3a4a;
+        }
         .video-box img { width: 100%; display: block; }
-        .status-bar { display: flex; justify-content: space-between; align-items: center; background: #1a2a3a; border-radius: 12px; padding: 20px; margin-top: 15px; border: 2px solid #2a3a4a; }
-        .status-item { text-align: center; flex: 1; }
-        .status-item .label { font-size: 14px; color: #8899aa; }
-        .status-item .value { font-size: 36px; font-weight: bold; margin-top: 5px; }
-        .status-item .value.count { color: #00d4ff; }
-        .status-item .value.alarm { color: #ff4444; }
-        .status-item .value.safe { color: #44ff44; }
-        .threshold-box { display: flex; gap: 10px; align-items: center; margin-top: 15px; background: #1a2a3a; border-radius: 12px; padding: 15px 20px; border: 2px solid #2a3a4a; justify-content: center; }
-        .threshold-box input { padding: 8px 12px; border-radius: 6px; border: 1px solid #2a3a4a; background: #0f1923; color: #fff; font-size: 16px; width: 80px; text-align: center; }
-        .threshold-box button { padding: 8px 20px; border-radius: 6px; border: none; background: #00d4ff; color: #0f1923; font-weight: bold; cursor: pointer; font-size: 14px; }
-        .threshold-box button:hover { background: #00b8e6; }
-        .alarm-banner { display: none; text-align: center; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 18px; margin-top: 10px; }
+
+        /* 右侧面板 */
+        .right-panel { flex: 1; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+        /* 统计卡片 */
+        .stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .stat-card {
+            background: #1a2a3a; border-radius: 10px; padding: 14px;
+            border: 2px solid #2a3a4a; text-align: center;
+        }
+        .stat-card .label { font-size: 13px; color: #8899aa; }
+        .stat-card .value { font-size: 28px; font-weight: bold; margin-top: 4px; }
+        .stat-card .value.c1 { color: #00d4ff; }
+        .stat-card .value.c2 { color: #ff4444; }
+        .stat-card .value.c3 { color: #ffaa00; }
+        .stat-card .value.c4 { color: #44ff44; }
+
+        /* 折线图 */
+        .chart-box {
+            background: #1a2a3a; border-radius: 10px; padding: 14px;
+            border: 2px solid #2a3a4a; flex: 1; min-height: 260px;
+        }
+        .chart-box canvas { width: 100% !important; height: 100% !important; }
+
+        /* 控制栏 */
+        .control-bar {
+            display: flex; gap: 10px; align-items: center; margin-top: 12px;
+            background: #1a2a3a; border-radius: 10px; padding: 12px 18px;
+            border: 2px solid #2a3a4a; justify-content: center; flex-wrap: wrap;
+        }
+        .control-bar input {
+            padding: 7px 10px; border-radius: 6px; border: 1px solid #2a3a4a;
+            background: #0f1923; color: #fff; font-size: 15px; width: 70px; text-align: center;
+        }
+        .control-bar button {
+            padding: 7px 16px; border-radius: 6px; border: none;
+            font-weight: bold; cursor: pointer; font-size: 13px;
+            transition: opacity 0.2s;
+        }
+        .control-bar button:hover { opacity: 0.85; }
+        .control-bar .btn-set { background: #00d4ff; color: #0f1923; }
+        .control-bar .btn-alarm-on { background: #ff4444; color: #fff; }
+        .control-bar .btn-alarm-off { background: #44ff44; color: #0f1923; }
+
+        .alarm-banner {
+            display: none; text-align: center; padding: 10px; border-radius: 8px;
+            font-weight: bold; font-size: 17px; margin-top: 10px;
+        }
         .alarm-banner.active { display: block; background: #ff4444; color: #fff; animation: blink 0.8s infinite; }
         @keyframes blink { 50% { opacity: 0.5; } }
-        .fps { font-size: 13px; color: #667788; margin-top: 5px; }
-        .video-placeholder { width: 100%; aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center; background: #0a1520; color: #667788; font-size: 16px; }
+
+        /* 报警历史表格 */
+        .alarm-section {
+            background: #1a2a3a; border-radius: 10px; padding: 16px 20px;
+            margin-top: 12px; border: 2px solid #2a3a4a;
+        }
+        .alarm-section h3 { font-size: 16px; color: #00d4ff; margin-bottom: 10px; }
+        .alarm-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .alarm-table th {
+            text-align: left; padding: 8px 10px;
+            color: #8899aa; border-bottom: 1px solid #2a3a4a; font-weight: normal;
+        }
+        .alarm-table td { padding: 8px 10px; border-bottom: 1px solid #1e2e3e; }
+        .alarm-table .ongoing { color: #ff4444; }
+
+        .empty-hint { color: #556677; text-align: center; padding: 20px; font-size: 14px; }
+        .fps-badge { font-size: 12px; color: #667788; }
+
+        @media (max-width: 1000px) {
+            .main-row { flex-direction: column; }
+            .video-box { flex: auto; }
+        }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1>🏫 校园人流量监测系统</h1>
+    <h1>🏫 校园人流量监测 · 应急预警系统</h1>
 
-    <div class="video-box">
-        <img id="videoFeed" src="/video_feed" alt="视频流">
+    <div class="main-row">
+        <!-- 左侧：视频 -->
+        <div class="video-box">
+            <img id="videoFeed" src="/video_feed" alt="视频流">
+        </div>
+
+        <!-- 右侧：统计 + 图表 -->
+        <div class="right-panel">
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="label">当前人数</div>
+                    <div class="value c1" id="countDisplay">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">报警状态</div>
+                    <div class="value c4" id="alarmDisplay">正常</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">今日累计检测</div>
+                    <div class="value c1" id="totalDet">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">今日报警次数 / 峰值</div>
+                    <div class="value c2" id="alarmStats" style="font-size:20px;">0 / 0</div>
+                </div>
+            </div>
+
+            <div class="chart-box">
+                <canvas id="trendChart"></canvas>
+            </div>
+            <div class="fps-badge" style="text-align:right" id="fpsDisplay">FPS: --</div>
+        </div>
     </div>
 
-    <div class="status-bar">
-        <div class="status-item">
-            <div class="label">当前人数</div>
-            <div class="value count" id="countDisplay">0</div>
-        </div>
-        <div class="status-item">
-            <div class="label">报警状态</div>
-            <div class="value safe" id="alarmDisplay">正常</div>
-        </div>
-        <div class="status-item">
-            <div class="label">帧率</div>
-            <div class="value count" id="fpsDisplay" style="font-size:24px;">0</div>
-        </div>
-    </div>
-
-    <div class="threshold-box">
+    <!-- 控制栏 -->
+    <div class="control-bar">
         <span>报警阈值：</span>
         <input type="number" id="thresholdInput" value="5" min="1" max="100">
-        <button onclick="setThreshold()">设置</button>
+        <button class="btn-set" onclick="setThreshold()">设置</button>
         <span style="margin-left:20px;">手动控制：</span>
-        <button onclick="manualAlarm('alarm_on')" style="background:#ff4444;">⚠ 报警</button>
-        <button onclick="manualAlarm('alarm_off')" style="background:#44ff44;">✅ 解除</button>
+        <button class="btn-alarm-on" onclick="manualAlarm('alarm_on')">⚠ 报警</button>
+        <button class="btn-alarm-off" onclick="manualAlarm('alarm_off')">✅ 解除</button>
     </div>
 
     <div class="alarm-banner" id="alarmBanner">⚠️ 超过阈值！请疏散！</div>
+
+    <!-- 报警事件历史 -->
+    <div class="alarm-section">
+        <h3>🕐 报警事件历史</h3>
+        <div id="alarmTableWrap">
+            <div class="empty-hint">暂无报警记录</div>
+        </div>
+    </div>
 </div>
 
 <script>
+    // ==================== 折线图 ====================
+    const ctx = document.getElementById('trendChart').getContext('2d');
+    const chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: '人数',
+                data: [],
+                borderColor: '#00d4ff',
+                backgroundColor: 'rgba(0,212,255,0.08)',
+                fill: true,
+                tension: 0.3,
+                pointRadius: 1,
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 300 },
+            plugins: {
+                legend: { display: false },
+            },
+            scales: {
+                x: {
+                    ticks: { color: '#556677', maxTicksLimit: 6, font: { size: 10 } },
+                    grid: { color: '#1e2e3e' }
+                },
+                y: {
+                    beginAtZero: true,
+                    ticks: { color: '#556677', stepSize: 1, font: { size: 10 } },
+                    grid: { color: '#1e2e3e' }
+                }
+            }
+        }
+    });
+
+    function updateChart() {
+        fetch('/history')
+            .then(r => r.json())
+            .then(rows => {
+                chart.data.labels = rows.map(r => {
+                    const t = r.timestamp.split('T')[1];
+                    return t ? t.substring(0, 5) : '';
+                });
+                chart.data.datasets[0].data = rows.map(r => r.count);
+                chart.update('none');
+            })
+            .catch(() => {});
+    }
+
+    // ==================== 报警事件表格 ====================
+    function updateAlarmTable() {
+        fetch('/alarms')
+            .then(r => r.json())
+            .then(rows => {
+                const wrap = document.getElementById('alarmTableWrap');
+                if (!rows.length) {
+                    wrap.innerHTML = '<div class="empty-hint">暂无报警记录</div>';
+                    return;
+                }
+                let html = '<table class="alarm-table">'
+                    + '<tr><th>开始时间</th><th>结束时间</th><th>峰值人数</th><th>持续时长</th></tr>';
+                rows.forEach(r => {
+                    const start = r.start_time.split('T')[1] || r.start_time;
+                    const end = r.end_time
+                        ? r.end_time.split('T')[1] || r.end_time
+                        : '<span class="ongoing">进行中</span>';
+                    const dur = r.duration != null ? r.duration + 's' : '-';
+                    html += `<tr>
+                        <td>${start.substring(0,8)}</td>
+                        <td>${end.substring(0,8)}</td>
+                        <td>${r.max_count}</td>
+                        <td>${dur}</td>
+                    </tr>`;
+                });
+                html += '</table>';
+                wrap.innerHTML = html;
+            })
+            .catch(() => {});
+    }
+
+    // ==================== 状态更新 ====================
     function updateStatus() {
         fetch('/status')
             .then(r => r.json())
             .then(data => {
                 document.getElementById('countDisplay').textContent = data.count;
-                document.getElementById('fpsDisplay').textContent = data.fps + ' FPS';
+                document.getElementById('fpsDisplay').textContent = 'FPS: ' + data.fps;
+                document.getElementById('totalDet').textContent = data.today_detections;
+                document.getElementById('alarmStats').textContent = data.today_alarms + ' / ' + data.peak_count;
 
                 const alarmEl = document.getElementById('alarmDisplay');
                 const banner = document.getElementById('alarmBanner');
                 if (data.alarm) {
                     alarmEl.textContent = '⚠️ 报警中';
-                    alarmEl.className = 'value alarm';
+                    alarmEl.className = 'value c2';
                     banner.className = 'alarm-banner active';
                 } else {
                     alarmEl.textContent = '✅ 正常';
-                    alarmEl.className = 'value safe';
+                    alarmEl.className = 'value c4';
                     banner.className = 'alarm-banner';
                 }
 
@@ -102,9 +288,8 @@
     }
 
     function manualAlarm(action) {
-        const btn = action === 'alarm_on'
-            ? document.querySelectorAll('button')[1]
-            : document.querySelectorAll('button')[2];
+        const btns = document.querySelectorAll('.btn-alarm-on, .btn-alarm-off');
+        const btn = action === 'alarm_on' ? btns[0] : btns[1];
         const origText = btn.textContent;
         btn.textContent = '...';
         btn.style.opacity = '0.5';
@@ -113,11 +298,12 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: action })
         }).then(r => r.json()).then(d => {
-            btn.textContent = origText;
             btn.style.opacity = '1';
             if (d.status === 'ok') {
                 btn.textContent = '✓ 已发送';
                 setTimeout(() => { btn.textContent = origText; }, 800);
+            } else {
+                btn.textContent = origText;
             }
         }).catch(() => {
             btn.textContent = origText;
@@ -125,8 +311,14 @@
         });
     }
 
-    setInterval(updateStatus, 1000);
+    // ==================== 定时刷新 ====================
+    setInterval(updateStatus, 2000);
+    setInterval(updateChart, 2000);
+    setInterval(updateAlarmTable, 5000);
+
     updateStatus();
+    updateChart();
+    updateAlarmTable();
 </script>
 </body>
 </html>

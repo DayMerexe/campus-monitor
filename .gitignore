@@ -30,6 +30,9 @@ JLinkLog.txt
 *.pt
 *.pth
 
+# SQLite
+data.db
+
 # OS
 .DS_Store
 Thumbs.db
