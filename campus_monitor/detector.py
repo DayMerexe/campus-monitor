@@ -13,7 +13,7 @@ from db import init_db, insert_detection, start_alarm, end_alarm
 from tcp_server import tcp_broadcast
 
 # 配置
-ESP32_CAM_URL = "http://192.168.4.183:81/stream"
+ESP32_CAM_URL = "http://192.168.4.121:81/stream"
 CONFIDENCE_THRESHOLD = 0.6
 PERSON_CLASS_ID = 0
 
