@@ -45,6 +45,7 @@ def detect_loop():
     frame_count = 0
     fps_timer = time.time()
     last_db_write = time.time()
+    last_tcp_send = 0.0
 
     # 报警防抖参数
     ALARM_CONFIRM = 3       # 连续确认帧数
@@ -157,9 +158,12 @@ def detect_loop():
                     annotated_frame = annotated
 
                 # TCP 发送给 STM32（手动报警期间跳过自动发送）
-                if not manual_alarm_active:
+                # 限制频率：最多 2 次/秒，避免洪水冲垮 STM32 的 UART 轮询
+                now2 = time.time()
+                if not manual_alarm_active and (now2 - last_tcp_send >= 0.5):
                     alarm_val = 1 if alarm_active else 0
                     tcp_broadcast(f"COUNT:{count},ALARM:{alarm_val}\n")
+                    last_tcp_send = now2
 
                 # 约每 2 秒写一条 DB 记录
                 now = time.time()
