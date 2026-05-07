@@ -6,10 +6,7 @@ import time
 from flask import Flask, render_template, Response, jsonify, request
 
 from db import init_db, get_recent_records, get_alarm_events, get_today_stats
-from detector import (
-    detect_loop, generate_frames,
-    person_count, alarm_active, current_fps, ALARM_THRESHOLD
-)
+import detector
 from tcp_server import tcp_server, tcp_broadcast
 
 app = Flask(__name__)
@@ -30,10 +27,10 @@ def video_feed():
 def status():
     stats = get_today_stats()
     return jsonify({
-        'count': person_count,
-        'alarm': alarm_active,
-        'threshold': ALARM_THRESHOLD,
-        'fps': round(current_fps, 1),
+        'count': detector.person_count,
+        'alarm': detector.alarm_active,
+        'threshold': detector.ALARM_THRESHOLD,
+        'fps': round(detector.current_fps, 1),
         'today_detections': stats['total_detections'],
         'today_alarms': stats['alarm_count'],
         'peak_count': stats['peak_count']
@@ -44,7 +41,6 @@ def status():
 def set_threshold():
     data = request.get_json()
     if data and 'threshold' in data:
-        import detector
         detector.ALARM_THRESHOLD = int(data['threshold'])
         print(f"阈值已更新: {detector.ALARM_THRESHOLD}")
         return jsonify({'status': 'ok', 'threshold': detector.ALARM_THRESHOLD})
@@ -58,9 +54,11 @@ def manual_control():
     if data and 'action' in data:
         action = data['action']
         if action == 'alarm_on':
+            detector.manual_alarm_active = True
             tcp_broadcast("COUNT:0,ALARM:1\n")
             return jsonify({'status': 'ok', 'action': 'alarm_on'})
         elif action == 'alarm_off':
+            detector.manual_alarm_active = False
             tcp_broadcast("COUNT:0,ALARM:0\n")
             return jsonify({'status': 'ok', 'action': 'alarm_off'})
     return jsonify({'status': 'error'}), 400
@@ -84,7 +82,7 @@ if __name__ == '__main__':
     init_db()
     print("✅ 数据库已初始化")
 
-    t1 = threading.Thread(target=detect_loop, daemon=True)
+    t1 = threading.Thread(target=detector.detect_loop, daemon=True)
     t2 = threading.Thread(target=tcp_server, daemon=True)
     t1.start()
     t2.start()

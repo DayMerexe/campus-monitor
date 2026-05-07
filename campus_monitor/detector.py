@@ -22,6 +22,7 @@ person_count = 0
 alarm_active = False
 current_fps = 0
 ALARM_THRESHOLD = 5
+manual_alarm_active = False  # 手动报警标志，为 True 时暂停自动 TCP 发送
 
 # 报警事件跟踪
 alarm_event_id = None   # 当前报警事件 ID
@@ -100,9 +101,10 @@ def detect_loop():
             with frame_lock:
                 annotated_frame = annotated
 
-            # TCP 发送给 STM32
-            alarm_val = 1 if alarm_active else 0
-            tcp_broadcast(f"COUNT:{count},ALARM:{alarm_val}\n")
+            # TCP 发送给 STM32（手动报警期间跳过自动发送）
+            if not manual_alarm_active:
+                alarm_val = 1 if alarm_active else 0
+                tcp_broadcast(f"COUNT:{count},ALARM:{alarm_val}\n")
 
             # 约每 2 秒写一条 DB 记录
             now = time.time()
