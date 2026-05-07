@@ -65,8 +65,8 @@ void setup() {
   config.pin_sccb_scl = SIOC_GPIO_NUM;
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
-  config.xclk_freq_hz = 30000000;
-  config.frame_size = FRAMESIZE_VGA;      // 640×480
+  config.xclk_freq_hz = 20000000;
+  config.frame_size = FRAMESIZE_QVGA;      // 640×480
   config.pixel_format = PIXFORMAT_JPEG; // for streaming
   //config.pixel_format = PIXFORMAT_RGB565; // for face detection/recognition
   config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
@@ -115,11 +115,11 @@ void setup() {
   }
   // drop down frame size for higher initial frame rate
   if(config.pixel_format == PIXFORMAT_JPEG){
-    s->set_framesize(s, FRAMESIZE_VGA);
+    s->set_framesize(s, FRAMESIZE_QVGA);
   }
 
   /* 自定义画质参数 */
-  s->set_quality(s, 28);             // 画质 0-63，越小越好（28=高压缩换帧率）
+  s->set_quality(s, 50);             // 画质 0-63，越大压缩越高帧率越快
   s->set_brightness(s, -1);
   s->set_contrast(s, -1);
   s->set_saturation(s, -1);

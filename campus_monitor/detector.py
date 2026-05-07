@@ -2,6 +2,8 @@
 检测引擎 — OpenCV 读流 + YOLOv8 推理 + 画框 + DB 写入 + TCP 广播
 """
 import cv2
+import numpy as np
+import requests
 import threading
 import time
 import torch
@@ -45,82 +47,106 @@ def detect_loop():
     last_db_write = time.time()
 
     while True:
-        cap = cv2.VideoCapture(ESP32_CAM_URL)
-        if not cap.isOpened():
-            print("⚠️ 无法连接摄像头，5秒后重试...")
+        try:
+            r = requests.get(ESP32_CAM_URL, stream=True, timeout=10)
+            if r.status_code != 200:
+                print("⚠️ 无法连接摄像头，5秒后重试...")
+                time.sleep(5)
+                continue
+        except Exception as e:
+            print(f"⚠️ 无法连接摄像头: {e}，5秒后重试...")
             time.sleep(5)
             continue
 
-        print("✅ ESP32-CAM 视频流已连接")
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        print("✅ ESP32-CAM 视频流已连接 (HTTP raw)")
 
-        while True:
-            t0 = time.time()
-            ret, frame = cap.read()
-            if not ret or frame is None:
-                print("⚠️ 视频流断开")
-                break
+        buf = b''
+        try:
+            for chunk in r.iter_content(chunk_size=1024):
+                buf += chunk
+                a = buf.find(b'\xff\xd8')   # JPEG SOI
+                b = buf.find(b'\xff\xd9')   # JPEG EOI
+                if a == -1 or b == -1:
+                    continue
 
-            # YOLO 推理
-            results = model(frame, conf=CONFIDENCE_THRESHOLD, verbose=False)
+                jpg = buf[a:b + 2]
+                buf = buf[b + 2:]
+                if len(buf) > 100 * 1024:
+                    buf = buf[-50 * 1024:]   # 防止内存膨胀
 
-            count = sum(1 for box in results[0].boxes
-                        if int(box.cls[0]) == PERSON_CLASS_ID)
+                frame = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8),
+                                     cv2.IMREAD_COLOR)
+                if frame is None:
+                    continue
 
-            prev_alarm = alarm_active
-            person_count = count
-            alarm_active = count > ALARM_THRESHOLD
+                t0 = time.time()
 
-            # 报警事件管理
-            if alarm_active:
-                if count > alarm_max_count:
-                    alarm_max_count = count
-                if not prev_alarm:
-                    # 报警开始
-                    alarm_event_id = start_alarm(count)
-                    alarm_max_count = count
-                    print(f"🚨 报警触发！人数: {count}")
-            elif prev_alarm and alarm_event_id is not None:
-                # 报警结束
-                end_alarm(alarm_event_id, alarm_max_count)
-                print(f"✅ 报警解除。峰值: {alarm_max_count}")
-                alarm_event_id = None
-                alarm_max_count = 0
+                # YOLO 推理
+                results = model(frame, conf=CONFIDENCE_THRESHOLD, verbose=False)
 
-            # 画框
-            annotated = frame.copy()
-            for box in results[0].boxes:
-                if int(box.cls[0]) == PERSON_CLASS_ID:
-                    x1, y1, x2, y2 = map(int, box.xyxy[0])
-                    conf = float(box.conf[0])
-                    cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                    cv2.putText(annotated, f"person {conf:.2f}", (x1, y1 - 5),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-            cv2.putText(annotated, f"Count: {count}  FPS:{current_fps:.1f}", (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            with frame_lock:
-                annotated_frame = annotated
+                count = sum(1 for box in results[0].boxes
+                            if int(box.cls[0]) == PERSON_CLASS_ID)
 
-            # TCP 发送给 STM32（手动报警期间跳过自动发送）
-            if not manual_alarm_active:
-                alarm_val = 1 if alarm_active else 0
-                tcp_broadcast(f"COUNT:{count},ALARM:{alarm_val}\n")
+                prev_alarm = alarm_active
+                person_count = count
+                alarm_active = count > ALARM_THRESHOLD
 
-            # 约每 2 秒写一条 DB 记录
-            now = time.time()
-            if now - last_db_write >= 2.0:
-                insert_detection(count, alarm_val, round(current_fps, 1))
-                last_db_write = now
+                # 报警事件管理
+                if alarm_active:
+                    if count > alarm_max_count:
+                        alarm_max_count = count
+                    if not prev_alarm:
+                        # 报警开始
+                        alarm_event_id = start_alarm(count)
+                        alarm_max_count = count
+                        print(f"🚨 报警触发！人数: {count}")
+                elif prev_alarm and alarm_event_id is not None:
+                    # 报警结束
+                    end_alarm(alarm_event_id, alarm_max_count)
+                    print(f"✅ 报警解除。峰值: {alarm_max_count}")
+                    alarm_event_id = None
+                    alarm_max_count = 0
 
-            # FPS 统计
-            frame_count += 1
-            elapsed = now - fps_timer
-            if elapsed >= 2.0:
-                current_fps = frame_count / elapsed
-                frame_count = 0
-                fps_timer = now
+                # 画框
+                annotated = frame.copy()
+                for box in results[0].boxes:
+                    if int(box.cls[0]) == PERSON_CLASS_ID:
+                        x1, y1, x2, y2 = map(int, box.xyxy[0])
+                        conf = float(box.conf[0])
+                        cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                        cv2.putText(annotated, f"person {conf:.2f}", (x1, y1 - 5),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                cv2.putText(annotated, f"Count: {count}  FPS:{current_fps:.1f}", (10, 30),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                with frame_lock:
+                    annotated_frame = annotated
 
-        cap.release()
+                # TCP 发送给 STM32（手动报警期间跳过自动发送）
+                if not manual_alarm_active:
+                    alarm_val = 1 if alarm_active else 0
+                    tcp_broadcast(f"COUNT:{count},ALARM:{alarm_val}\n")
+
+                # 约每 2 秒写一条 DB 记录
+                now = time.time()
+                if now - last_db_write >= 2.0:
+                    insert_detection(count, alarm_val, round(current_fps, 1))
+                    last_db_write = now
+
+                # FPS 统计
+                frame_count += 1
+                elapsed = now - fps_timer
+                if elapsed >= 2.0:
+                    current_fps = frame_count / elapsed
+                    frame_count = 0
+                    fps_timer = now
+
+        except (requests.ConnectionError, requests.Timeout):
+            print("⚠️ 视频流断开")
+        finally:
+            try:
+                r.close()
+            except Exception:
+                pass
         time.sleep(2)
 
 
