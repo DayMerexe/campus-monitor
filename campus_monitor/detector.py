@@ -74,6 +74,9 @@ def detect_loop():
                 if len(buf) > 100 * 1024:
                     buf = buf[-50 * 1024:]   # 防止内存膨胀
 
+                if len(jpg) < 100:
+                    continue
+
                 frame = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8),
                                      cv2.IMREAD_COLOR)
                 if frame is None:
@@ -81,8 +84,11 @@ def detect_loop():
 
                 t0 = time.time()
 
-                # YOLO 推理
-                results = model(frame, conf=CONFIDENCE_THRESHOLD, verbose=False)
+                # YOLO 推理（在缩小后的帧上跑，快很多）
+                small = cv2.resize(frame, (320, 240))
+                results = model(small, conf=CONFIDENCE_THRESHOLD, verbose=False)
+                sx = frame.shape[1] / 320
+                sy = frame.shape[0] / 240
 
                 count = sum(1 for box in results[0].boxes
                             if int(box.cls[0]) == PERSON_CLASS_ID)
@@ -112,6 +118,8 @@ def detect_loop():
                 for box in results[0].boxes:
                     if int(box.cls[0]) == PERSON_CLASS_ID:
                         x1, y1, x2, y2 = map(int, box.xyxy[0])
+                        x1, y1 = int(x1 * sx), int(y1 * sy)
+                        x2, y2 = int(x2 * sx), int(y2 * sy)
                         conf = float(box.conf[0])
                         cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
                         cv2.putText(annotated, f"person {conf:.2f}", (x1, y1 - 5),
