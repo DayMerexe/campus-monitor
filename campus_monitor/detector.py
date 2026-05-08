@@ -14,7 +14,7 @@ from tcp_server import tcp_broadcast
 
 # 配置
 ESP32_CAM_URL = "http://192.168.4.121:81/stream"
-CONFIDENCE_THRESHOLD = 0.6
+CONFIDENCE_THRESHOLD = 0.5
 PERSON_CLASS_ID = 0
 
 # 全局状态（供 app.py 的路由读取）

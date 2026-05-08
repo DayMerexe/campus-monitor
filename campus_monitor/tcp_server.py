@@ -34,6 +34,12 @@ def tcp_server():
     while True:
         try:
             conn, addr = server.accept()
+            # 设置 keepalive，及时检测死连接
+            conn.settimeout(5.0)
+            try:
+                conn.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+            except:
+                pass
             print(f"✅ ESP8266 已连接: {addr}")
             with tcp_lock:
                 tcp_clients.append(conn)
