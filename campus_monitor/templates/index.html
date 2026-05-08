@@ -6,118 +6,325 @@
     <title>校园人流量监测系统</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        :root {
+            --glass-bg: rgba(255,255,255,0.05);
+            --glass-border: rgba(255,255,255,0.08);
+            --glass-hover: rgba(255,255,255,0.08);
+            --glass-shadow: 0 4px 24px rgba(0,0,0,0.2), 0 1px 3px rgba(0,0,0,0.1);
+            --blue: #64a8ff;
+            --blue-bg: rgba(100,168,255,0.08);
+            --red: #ff5a5a;
+            --red-bg: rgba(255,90,90,0.08);
+            --green: #5ddb8f;
+            --amber: #f5b64c;
+            --text-primary: rgba(255,255,255,0.9);
+            --text-secondary: rgba(255,255,255,0.5);
+            --text-dim: rgba(255,255,255,0.25);
+            --radius: 12px;
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Segoe UI', sans-serif;
-            background: #0f1923; color: #fff;
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: linear-gradient(145deg, #111624 0%, #1a2133 50%, #121827 100%);
+            color: var(--text-primary);
             min-height: 100vh;
-            display: flex; justify-content: center; align-items: flex-start;
-            padding-top: 20px;
+            display: flex; justify-content: center;
+            padding: 20px 16px;
         }
-        .container { max-width: 1240px; width: 100%; padding: 20px; }
-
-        h1 {
-            text-align: center; font-size: 22px;
-            margin-bottom: 15px; color: #00d4ff;
+        .container {
+            max-width: 1320px; width: 100%;
         }
 
-        /* 双栏主区域 */
-        .main-row { display: flex; gap: 15px; }
+        /* ===== 顶栏 ===== */
+        .top-bar {
+            display: flex; justify-content: space-between; align-items: flex-end;
+            margin-bottom: 20px; padding-bottom: 14px;
+            border-bottom: 1px solid var(--glass-border);
+        }
+        .top-bar h1 {
+            font-size: 22px; font-weight: 600;
+            letter-spacing: -0.3px;
+            color: var(--text-primary);
+        }
+        .top-bar h1 span { color: var(--blue); }
+        .top-bar .subtitle {
+            font-size: 12px; color: var(--text-secondary);
+            margin-top: 2px; letter-spacing: 0.5px;
+        }
+        .top-right {
+            display: flex; align-items: center; gap: 14px;
+        }
+        .fps-badge {
+            font-size: 12px; color: var(--text-secondary);
+            font-variant-numeric: tabular-nums;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            padding: 5px 12px;
+            border-radius: 6px;
+        }
 
-        /* 左侧视频 */
+        /* ===== 主区域 ===== */
+        .main-row { display: flex; gap: 16px; }
+
+        /* 左侧列 */
+        .left-col { flex: 0 0 640px; display: flex; flex-direction: column; gap: 14px; }
         .video-box {
-            flex: 0 0 640px;
-            background: #1a2a3a; border-radius: 10px; overflow: hidden;
-            border: 2px solid #2a3a4a;
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            position: relative;
+            box-shadow: var(--glass-shadow);
         }
         .video-box img { width: 100%; display: block; }
-
-        /* 右侧面板 */
-        .right-panel { flex: 1; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-
-        /* 统计卡片 */
-        .stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .stat-card {
-            background: #1a2a3a; border-radius: 10px; padding: 14px;
-            border: 2px solid #2a3a4a; text-align: center;
+        .video-box .live-tag {
+            position: absolute; top: 12px; left: 12px;
+            display: flex; align-items: center; gap: 5px;
+            background: rgba(0,0,0,0.45);
+            backdrop-filter: blur(8px);
+            padding: 4px 10px; border-radius: 6px;
+            font-size: 11px; font-weight: 600;
+            color: var(--red);
         }
-        .stat-card .label { font-size: 13px; color: #8899aa; }
-        .stat-card .value { font-size: 28px; font-weight: bold; margin-top: 4px; }
-        .stat-card .value.c1 { color: #00d4ff; }
-        .stat-card .value.c2 { color: #ff4444; }
-        .stat-card .value.c3 { color: #ffaa00; }
-        .stat-card .value.c4 { color: #44ff44; }
+        .video-box .live-tag::before {
+            content: '';
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--red);
+            animation: live-dot 1.5s ease-in-out infinite;
+        }
+        @keyframes live-dot {
+            0%, 100% { opacity: 1; box-shadow: 0 0 4px var(--red); }
+            50% { opacity: 0.3; box-shadow: none; }
+        }
 
-        /* 折线图 */
+        /* 控制栏（改放到视频下方） */
+        .control-bar {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius);
+            padding: 14px 18px;
+            display: flex; align-items: center; gap: 10px;
+            flex-wrap: wrap;
+            font-size: 13px;
+            box-shadow: var(--glass-shadow);
+        }
+        .control-bar .sep {
+            width: 1px; height: 24px;
+            background: var(--glass-border);
+            margin: 0 4px;
+        }
+        .control-bar label {
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+        .control-bar input {
+            padding: 7px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--glass-border);
+            background: rgba(0,0,0,0.15);
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 14px;
+            width: 64px;
+            text-align: center;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .control-bar input:focus {
+            border-color: var(--blue);
+            box-shadow: 0 0 0 3px rgba(100,168,255,0.1);
+        }
+        .control-bar button {
+            padding: 7px 16px;
+            border-radius: 6px;
+            border: 1px solid var(--glass-border);
+            background: rgba(0,0,0,0.15);
+            font-family: inherit;
+            font-weight: 500;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.15s;
+            color: var(--text-primary);
+        }
+        .control-bar button:hover {
+            background: var(--glass-hover);
+        }
+        .control-bar .btn-alarm-on {
+            color: var(--red);
+            border-color: rgba(255,90,90,0.2);
+            background: rgba(255,90,90,0.06);
+        }
+        .control-bar .btn-alarm-on:hover {
+            background: rgba(255,90,90,0.12);
+        }
+        .control-bar .btn-alarm-off {
+            color: var(--green);
+            border-color: rgba(93,219,143,0.2);
+            background: rgba(93,219,143,0.06);
+        }
+        .control-bar .btn-alarm-off:hover {
+            background: rgba(93,219,143,0.12);
+        }
+
+        /* 右侧列 */
+        .right-col { flex: 1; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+
+        /* 统计卡片（竖排，比 2x2 更清晰） */
+        .stats-grid {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .stat-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius);
+            padding: 18px 14px;
+            text-align: center;
+            transition: all 0.2s;
+            box-shadow: var(--glass-shadow);
+        }
+        .stat-card:hover {
+            background: var(--glass-hover);
+            transform: translateY(-1px);
+        }
+        .stat-card .label {
+            font-size: 11px; color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        .stat-card .value {
+            font-size: 30px; font-weight: 700;
+            letter-spacing: -0.5px;
+            font-variant-numeric: tabular-nums;
+        }
+        .stat-card .value.c1 { color: var(--blue); }
+        .stat-card .value.c2 { color: var(--red); }
+        .stat-card .value.c3 { color: var(--amber); }
+        .stat-card .value.c4 { color: var(--green); }
+
+        /* 折线图卡片 */
         .chart-box {
-            background: #1a2a3a; border-radius: 10px; padding: 14px;
-            border: 2px solid #2a3a4a; flex: 1; min-height: 260px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius);
+            padding: 16px 16px 12px;
+            flex: 1; min-height: 240px;
+            box-shadow: var(--glass-shadow);
         }
         .chart-box canvas { width: 100% !important; height: 100% !important; }
 
-        /* 控制栏 */
-        .control-bar {
-            display: flex; gap: 10px; align-items: center; margin-top: 12px;
-            background: #1a2a3a; border-radius: 10px; padding: 12px 18px;
-            border: 2px solid #2a3a4a; justify-content: center; flex-wrap: wrap;
-        }
-        .control-bar input {
-            padding: 7px 10px; border-radius: 6px; border: 1px solid #2a3a4a;
-            background: #0f1923; color: #fff; font-size: 15px; width: 70px; text-align: center;
-        }
-        .control-bar button {
-            padding: 7px 16px; border-radius: 6px; border: none;
-            font-weight: bold; cursor: pointer; font-size: 13px;
-            transition: opacity 0.2s;
-        }
-        .control-bar button:hover { opacity: 0.85; }
-        .control-bar .btn-set { background: #00d4ff; color: #0f1923; }
-        .control-bar .btn-alarm-on { background: #ff4444; color: #fff; }
-        .control-bar .btn-alarm-off { background: #44ff44; color: #0f1923; }
-
+        /* ===== 报警横幅 ===== */
         .alarm-banner {
-            display: none; text-align: center; padding: 10px; border-radius: 8px;
-            font-weight: bold; font-size: 17px; margin-top: 10px;
+            display: none;
+            text-align: center;
+            padding: 14px;
+            margin-top: 14px;
+            border-radius: var(--radius);
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
         }
-        .alarm-banner.active { display: block; background: #ff4444; color: #fff; animation: blink 0.8s infinite; }
-        @keyframes blink { 50% { opacity: 0.5; } }
+        .alarm-banner.active {
+            display: block;
+            background: rgba(255,90,90,0.08);
+            border: 1px solid rgba(255,90,90,0.15);
+            color: var(--red);
+            animation: alarm-glow 1.5s ease-in-out infinite;
+        }
+        @keyframes alarm-glow {
+            0%, 100% { box-shadow: 0 0 16px rgba(255,90,90,0.04); }
+            50% { box-shadow: 0 0 32px rgba(255,90,90,0.1); }
+        }
 
-        /* 报警历史表格 */
+        /* ===== 报警历史 ===== */
         .alarm-section {
-            background: #1a2a3a; border-radius: 10px; padding: 16px 20px;
-            margin-top: 12px; border: 2px solid #2a3a4a;
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius);
+            padding: 16px 20px;
+            margin-top: 12px;
+            box-shadow: var(--glass-shadow);
         }
-        .alarm-section h3 { font-size: 16px; color: #00d4ff; margin-bottom: 10px; }
-        .alarm-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .alarm-section h3 {
+            font-size: 13px; font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+        .alarm-table { width: 100%; border-collapse: collapse; }
         .alarm-table th {
             text-align: left; padding: 8px 10px;
-            color: #8899aa; border-bottom: 1px solid #2a3a4a; font-weight: normal;
+            color: var(--text-dim);
+            border-bottom: 1px solid var(--glass-border);
+            font-weight: 500;
+            font-size: 12px;
         }
-        .alarm-table td { padding: 8px 10px; border-bottom: 1px solid #1e2e3e; }
-        .alarm-table .ongoing { color: #ff4444; }
+        .alarm-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--glass-border);
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+        .alarm-table .ongoing { color: var(--red); }
 
-        .empty-hint { color: #556677; text-align: center; padding: 20px; font-size: 14px; }
-        .fps-badge { font-size: 12px; color: #667788; }
+        .empty-hint {
+            color: var(--text-dim);
+            text-align: center;
+            padding: 24px;
+            font-size: 14px;
+        }
 
         @media (max-width: 1000px) {
             .main-row { flex-direction: column; }
-            .video-box { flex: auto; }
+            .left-col { flex: auto; }
+            body { padding: 12px; }
+            .top-bar { flex-direction: column; align-items: flex-start; gap: 8px; }
         }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1>🏫 校园人流量监测 · 应急预警系统</h1>
+    <!-- 顶栏 -->
+    <div class="top-bar">
+        <div>
+            <h1>📊 校园人流量 <span>监测预警</span></h1>
+            <div class="subtitle">Campus Crowd Monitoring &amp; Emergency Alert System</div>
+        </div>
+        <div class="top-right">
+            <div class="fps-badge" id="fpsDisplay">FPS: --</div>
+        </div>
+    </div>
 
+    <!-- 主区域：左视频 + 右统计 -->
     <div class="main-row">
-        <!-- 左侧：视频 -->
-        <div class="video-box">
-            <img id="videoFeed" src="/video_feed" alt="视频流">
+        <!-- 左侧列 -->
+        <div class="left-col">
+            <div class="video-box">
+                <div class="live-tag">LIVE</div>
+                <img id="videoFeed" src="/video_feed" alt="视频流">
+            </div>
+            <!-- 控制栏放在视频下方 -->
+            <div class="control-bar">
+                <label>阈值</label>
+                <input type="number" id="thresholdInput" value="5" min="1" max="100"
+                       onfocus="editingThreshold=true" onblur="editingThreshold=false">
+                <button class="btn-set" onclick="setThreshold()">设置</button>
+                <div class="sep"></div>
+                <button class="btn-alarm-on" onclick="manualAlarm('alarm_on')">⚠️ 报警</button>
+                <button class="btn-alarm-off" onclick="manualAlarm('alarm_off')">解除</button>
+            </div>
         </div>
 
-        <!-- 右侧：统计 + 图表 -->
-        <div class="right-panel">
-            <div class="stats-row">
+        <!-- 右侧列 -->
+        <div class="right-col">
+            <div class="stats-grid">
                 <div class="stat-card">
                     <div class="label">当前人数</div>
                     <div class="value c1" id="countDisplay">0</div>
@@ -127,38 +334,25 @@
                     <div class="value c4" id="alarmDisplay">正常</div>
                 </div>
                 <div class="stat-card">
-                    <div class="label">今日累计检测</div>
+                    <div class="label">今日检测</div>
                     <div class="value c1" id="totalDet">0</div>
                 </div>
                 <div class="stat-card">
-                    <div class="label">今日报警次数 / 峰值</div>
-                    <div class="value c2" id="alarmStats" style="font-size:20px;">0 / 0</div>
+                    <div class="label">报警 / 峰值</div>
+                    <div class="value c2" id="alarmStats" style="font-size:24px;">0 / 0</div>
                 </div>
             </div>
-
             <div class="chart-box">
                 <canvas id="trendChart"></canvas>
             </div>
-            <div class="fps-badge" style="text-align:right" id="fpsDisplay">FPS: --</div>
         </div>
     </div>
 
-    <!-- 控制栏 -->
-    <div class="control-bar">
-        <span>报警阈值：</span>
-        <input type="number" id="thresholdInput" value="5" min="1" max="100"
-               onfocus="editingThreshold=true" onblur="editingThreshold=false">
-        <button class="btn-set" onclick="setThreshold()">设置</button>
-        <span style="margin-left:20px;">手动控制：</span>
-        <button class="btn-alarm-on" onclick="manualAlarm('alarm_on')">⚠ 报警</button>
-        <button class="btn-alarm-off" onclick="manualAlarm('alarm_off')">✅ 解除</button>
-    </div>
+    <div class="alarm-banner" id="alarmBanner">⚠️ 超过阈值！请立即疏散！</div>
 
-    <div class="alarm-banner" id="alarmBanner">⚠️ 超过阈值！请疏散！</div>
-
-    <!-- 报警事件历史 -->
+    <!-- 报警历史 -->
     <div class="alarm-section">
-        <h3>🕐 报警事件历史</h3>
+        <h3>🕐 报警事件记录</h3>
         <div id="alarmTableWrap">
             <div class="empty-hint">暂无报警记录</div>
         </div>
@@ -168,7 +362,6 @@
 <script>
     let editingThreshold = false;
 
-    // ==================== 折线图 ====================
     const ctx = document.getElementById('trendChart').getContext('2d');
     const chart = new Chart(ctx, {
         type: 'line',
@@ -177,8 +370,8 @@
             datasets: [{
                 label: '人数',
                 data: [],
-                borderColor: '#00d4ff',
-                backgroundColor: 'rgba(0,212,255,0.08)',
+                borderColor: '#64a8ff',
+                backgroundColor: 'rgba(100,168,255,0.08)',
                 fill: true,
                 tension: 0.3,
                 pointRadius: 1,
@@ -189,18 +382,16 @@
             responsive: true,
             maintainAspectRatio: false,
             animation: { duration: 300 },
-            plugins: {
-                legend: { display: false },
-            },
+            plugins: { legend: { display: false } },
             scales: {
                 x: {
-                    ticks: { color: '#556677', maxTicksLimit: 6, font: { size: 10 } },
-                    grid: { color: '#1e2e3e' }
+                    ticks: { color: 'rgba(255,255,255,0.3)', maxTicksLimit: 6, font: { size: 10 } },
+                    grid: { color: 'rgba(255,255,255,0.04)' }
                 },
                 y: {
                     beginAtZero: true,
-                    ticks: { color: '#556677', stepSize: 1, font: { size: 10 } },
-                    grid: { color: '#1e2e3e' }
+                    ticks: { color: 'rgba(255,255,255,0.3)', stepSize: 1, font: { size: 10 } },
+                    grid: { color: 'rgba(255,255,255,0.04)' }
                 }
             }
         }
@@ -220,7 +411,6 @@
             .catch(() => {});
     }
 
-    // ==================== 报警事件表格 ====================
     function updateAlarmTable() {
         fetch('/alarms')
             .then(r => r.json())
@@ -251,7 +441,6 @@
             .catch(() => {});
     }
 
-    // ==================== 状态更新 ====================
     function updateStatus() {
         fetch('/status')
             .then(r => r.json())
@@ -316,7 +505,6 @@
         });
     }
 
-    // ==================== 定时刷新 ====================
     setInterval(updateStatus, 2000);
     setInterval(updateChart, 2000);
     setInterval(updateAlarmTable, 5000);
