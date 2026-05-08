@@ -33,6 +33,20 @@ JLinkLog.txt
 # SQLite
 data.db
 
+# Keil build outputs
+*.hex
+*.map
+
+# Archives & installers
+*.zip
+*.7z
+*.rar
+*.exe
+
+# Images (screenshots)
+*.jpg
+*.png
+
 # OS
 .DS_Store
 Thumbs.db
