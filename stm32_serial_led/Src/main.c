@@ -112,14 +112,9 @@ int main(void)
   HAL_UART_Transmit(&huart2, (uint8_t*)"AT\r\n", 4, 100);
   HAL_Delay(500);
 
-  HAL_UART_Transmit(&huart2, (uint8_t*)"AT+CWMODE=1\r\n", 13, 100);
-  HAL_Delay(500);
-
-  HAL_UART_Transmit(&huart2, (uint8_t*)"AT+CWJAP=\"test\",\"wxh708023\"\r\n", 31, 200);
-  HAL_Delay(8000);
-
+  /* ESP8266 上电自连 WiFi，只需连 TCP 即可 */
   HAL_UART_Transmit(&huart2, (uint8_t*)"AT+CIPSTART=\"TCP\",\"192.168.4.140\",8888\r\n", 43, 500);
-  HAL_Delay(3000);
+  HAL_Delay(4000);
 
   HAL_UART_Transmit(&huart2, (uint8_t*)"AT+CIPMODE=1\r\n", 14, 100);
   HAL_Delay(500);
@@ -176,6 +171,7 @@ int main(void)
         rx_idx = 0;  /* 清空行 buffer，下一条消息从 0 开始 */
       } else {
         /* 普通字节，追加到行 buffer */
+        HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_5);  /* DS0 翻转 = 收到字节 */
         rx_buf[rx_idx++] = ch;
         if (rx_idx >= 63) rx_idx = 0;  /* 溢出保护 */
       }
