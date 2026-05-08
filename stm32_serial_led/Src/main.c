@@ -151,34 +151,33 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    /* 同时监听 USART1（SSCOM）和 USART2（ESP8266）*/
+    /* 按行解析 USART2（ESP8266），每条消息独立，一条坏不影响下一条 */
     uint8_t ch;
-    int parsed = 0;
-
     if (HAL_UART_Receive(&huart2, &ch, 1, 1) == HAL_OK) {
-      HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_5);  /* 收到数据翻转 LED0 */
-      parsed = 1;
-    }
-
-    if (parsed) {
-      if (ch != '\r' && ch != '\n') {
-        rx_buf[rx_idx++] = ch;
-        if (rx_idx >= 63) rx_idx = 0;
+      if (ch == '\r') {
+        /* 忽略 */
+      } else if (ch == '\n') {
+        /* 一行结束，解析 */
         rx_buf[rx_idx] = '\0';
-
-        int count = 0, alarm = 0;
-        if (sscanf(rx_buf, "COUNT:%d,ALARM:%d", &count, &alarm) == 2) {
-          if (alarm == 1) {
-            HAL_GPIO_WritePin(GPIOE, GPIO_PIN_5, GPIO_PIN_RESET);
-            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
-            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
-          } else {
-            HAL_GPIO_WritePin(GPIOE, GPIO_PIN_5, GPIO_PIN_SET);
-            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
-            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
+        if (rx_idx > 0) {
+          int count = 0, alarm = 0;
+          if (sscanf(rx_buf, "COUNT:%d,ALARM:%d", &count, &alarm) == 2) {
+            if (alarm == 1) {
+              HAL_GPIO_WritePin(GPIOE, GPIO_PIN_5, GPIO_PIN_RESET);
+              HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
+              HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
+            } else {
+              HAL_GPIO_WritePin(GPIOE, GPIO_PIN_5, GPIO_PIN_SET);
+              HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
+              HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
+            }
           }
-          rx_idx = 0;
         }
+        rx_idx = 0;  /* 清空行 buffer，下一条消息从 0 开始 */
+      } else {
+        /* 普通字节，追加到行 buffer */
+        rx_buf[rx_idx++] = ch;
+        if (rx_idx >= 63) rx_idx = 0;  /* 溢出保护 */
       }
     }
   /* USER CODE END 3 */
