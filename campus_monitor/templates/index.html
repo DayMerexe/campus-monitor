@@ -146,7 +146,8 @@
     <!-- 控制栏 -->
     <div class="control-bar">
         <span>报警阈值：</span>
-        <input type="number" id="thresholdInput" value="5" min="1" max="100">
+        <input type="number" id="thresholdInput" value="5" min="1" max="100"
+               onfocus="editingThreshold=true" onblur="editingThreshold=false">
         <button class="btn-set" onclick="setThreshold()">设置</button>
         <span style="margin-left:20px;">手动控制：</span>
         <button class="btn-alarm-on" onclick="manualAlarm('alarm_on')">⚠ 报警</button>
@@ -165,6 +166,8 @@
 </div>
 
 <script>
+    let editingThreshold = false;
+
     // ==================== 折线图 ====================
     const ctx = document.getElementById('trendChart').getContext('2d');
     const chart = new Chart(ctx, {
@@ -270,7 +273,9 @@
                     banner.className = 'alarm-banner';
                 }
 
-                document.getElementById('thresholdInput').value = data.threshold;
+                if (!editingThreshold) {
+                    document.getElementById('thresholdInput').value = data.threshold;
+                }
             })
             .catch(() => {});
     }
