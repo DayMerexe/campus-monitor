@@ -21,9 +21,11 @@ PERSON_CLASS_ID = 0
 frame_lock = threading.Lock()
 annotated_frame = None
 person_count = 0
-alarm_active = False
+alarm_level = 0           # 0=正常, 1=黄色预警, 2=红色报警
+alarm_active = False       # 向后兼容: alarm_level > 0
 current_fps = 0
-ALARM_THRESHOLD = 5
+ALARM_THRESHOLD_RED = 5    # 红色报警阈值
+ALARM_THRESHOLD_WARN = 3   # 黄色预警阈值（自动 = RED - 2）
 manual_alarm_active = False  # 手动报警标志，为 True 时暂停自动 TCP 发送
 
 # 报警事件跟踪
@@ -37,9 +39,18 @@ if torch.cuda.is_available():
 print(f"✅ YOLOv8 模型已加载  (device: {model.device})")
 
 
+def get_target_level(count):
+    """根据当前人数返回目标报警等级"""
+    if count > ALARM_THRESHOLD_RED:
+        return 2  # 红色
+    elif count > ALARM_THRESHOLD_WARN:
+        return 1  # 黄色
+    return 0       # 正常
+
+
 def detect_loop():
     """后台线程：OpenCV 读 MJPEG + YOLOv8 检测 + DB 写入"""
-    global person_count, alarm_active, current_fps, annotated_frame
+    global person_count, alarm_level, alarm_active, current_fps, annotated_frame
     global alarm_event_id, alarm_max_count
 
     frame_count = 0
@@ -50,8 +61,7 @@ def detect_loop():
     # 报警防抖参数
     ALARM_CONFIRM = 3       # 连续确认帧数
     ALARM_LOCK = 3.0        # 状态切换后锁定秒数
-    consecutive_over = 0
-    consecutive_under = 0
+    consecutive = 0          # 单计数器，统计连续偏离目标等级的帧数
     last_state_change = 0.0
 
     while True:
@@ -105,39 +115,36 @@ def detect_loop():
                 now = time.time()
                 locked = (now - last_state_change) < ALARM_LOCK
 
-                # 报警防抖：连续确认 + 锁定保护
-                if not locked:
-                    if not alarm_active:
-                        if count > ALARM_THRESHOLD:
-                            consecutive_over += 1
-                            consecutive_under = 0
-                            if consecutive_over >= ALARM_CONFIRM:
-                                alarm_active = True
-                                last_state_change = now
-                                consecutive_over = 0
-                                alarm_event_id = start_alarm(count)
-                                alarm_max_count = count
-                                print(f"🚨 报警触发！人数: {count}")
-                        else:
-                            consecutive_over = 0
-                    else:
-                        if count <= ALARM_THRESHOLD:
-                            consecutive_under += 1
-                            consecutive_over = 0
-                            if consecutive_under >= ALARM_CONFIRM:
-                                alarm_active = False
-                                last_state_change = now
-                                consecutive_under = 0
-                                end_alarm(alarm_event_id, alarm_max_count)
-                                print(f"✅ 报警解除。峰值: {alarm_max_count}")
-                                alarm_event_id = None
-                                alarm_max_count = 0
-                        else:
-                            consecutive_under = 0
-                            if count > alarm_max_count:
-                                alarm_max_count = count
+                # 三级报警防抖：当前等级 ≠ 目标等级时累加计数器
+                old_level = alarm_level
+                target = get_target_level(count)
+                if target != old_level and not locked:
+                    consecutive += 1
+                    if consecutive >= ALARM_CONFIRM:
+                        alarm_level = target
+                        alarm_active = (target > 0)
+                        last_state_change = now
+                        consecutive = 0
 
-                # 锁定期间不切换状态，只跟踪峰值
+                        if target > 0 and old_level == 0:
+                            # 从正常进入报警
+                            alarm_event_id = start_alarm(count, target)
+                            alarm_max_count = count
+                            print(f"🚨 黄色预警触发！人数: {count}")
+                        elif target == 2 and old_level == 1:
+                            # 从黄色升级到红色
+                            alarm_max_count = count
+                            print(f"🔴 红色报警！人数: {count}")
+                        elif target == 0 and old_level > 0:
+                            # 报警解除
+                            end_alarm(alarm_event_id, alarm_max_count)
+                            print(f"✅ 报警解除。峰值: {alarm_max_count}")
+                            alarm_event_id = None
+                            alarm_max_count = 0
+                else:
+                    consecutive = 0
+
+                # 报警期间跟踪峰值
                 if alarm_active and count > alarm_max_count:
                     alarm_max_count = count
 
@@ -161,14 +168,13 @@ def detect_loop():
                 # 限制频率：最多 2 次/秒，避免洪水冲垮 STM32 的 UART 轮询
                 now2 = time.time()
                 if not manual_alarm_active and (now2 - last_tcp_send >= 0.5):
-                    alarm_val = 1 if alarm_active else 0
-                    tcp_broadcast(f"COUNT:{count},ALARM:{alarm_val}\n")
+                    tcp_broadcast(f"COUNT:{count},ALARM:{alarm_level}\n")
                     last_tcp_send = now2
 
                 # 约每 2 秒写一条 DB 记录
                 now = time.time()
                 if now - last_db_write >= 2.0:
-                    insert_detection(count, alarm_val, round(current_fps, 1))
+                    insert_detection(count, alarm_level, round(current_fps, 1))
                     last_db_write = now
 
                 # FPS 统计

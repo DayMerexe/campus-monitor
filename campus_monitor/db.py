@@ -32,6 +32,7 @@ def init_db():
                 start_time TEXT    NOT NULL,
                 end_time   TEXT,
                 max_count  INTEGER NOT NULL DEFAULT 0,
+                level      INTEGER NOT NULL DEFAULT 1,
                 duration   REAL
             );
         ''')
@@ -46,12 +47,12 @@ def insert_detection(count, alarm, fps):
         )
 
 
-def start_alarm(max_count):
+def start_alarm(max_count, level=1):
     """报警开始：插入新事件，返回事件 ID"""
     with get_conn() as conn:
         cur = conn.execute(
-            'INSERT INTO alarm_events (start_time, max_count) VALUES (?, ?)',
-            (datetime.now().isoformat(), max_count)
+            'INSERT INTO alarm_events (start_time, max_count, level) VALUES (?, ?, ?)',
+            (datetime.now().isoformat(), max_count, level)
         )
         return cur.lastrowid
 

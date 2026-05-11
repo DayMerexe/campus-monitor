@@ -157,14 +157,21 @@ int main(void)
         if (rx_idx > 0) {
           int count = 0, alarm = 0;
           if (sscanf(rx_buf, "COUNT:%d,ALARM:%d", &count, &alarm) == 2) {
-            if (alarm == 1) {
-              HAL_GPIO_WritePin(GPIOE, GPIO_PIN_5, GPIO_PIN_RESET);
-              HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
-              HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
-            } else {
+            if (alarm == 0) {
+              /* 正常：全部关闭 */
               HAL_GPIO_WritePin(GPIOE, GPIO_PIN_5, GPIO_PIN_SET);
               HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
               HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
+            } else if (alarm == 1) {
+              /* 黄色预警：黄灯慢闪，红灯/蜂鸣器关 */
+              HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_5);
+              HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
+              HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
+            } else if (alarm == 2) {
+              /* 红色报警：红灯亮 + 蜂鸣器响，黄灯常亮 */
+              HAL_GPIO_WritePin(GPIOE, GPIO_PIN_5, GPIO_PIN_RESET);
+              HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
+              HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
             }
           }
         }

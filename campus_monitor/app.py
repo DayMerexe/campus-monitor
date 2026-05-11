@@ -29,7 +29,9 @@ def status():
     return jsonify({
         'count': detector.person_count,
         'alarm': detector.alarm_active,
-        'threshold': detector.ALARM_THRESHOLD,
+        'alarm_level': detector.alarm_level,
+        'threshold': detector.ALARM_THRESHOLD_RED,
+        'threshold_warn': detector.ALARM_THRESHOLD_WARN,
         'fps': round(detector.current_fps, 1),
         'today_detections': stats['total_detections'],
         'today_alarms': stats['alarm_count'],
@@ -41,9 +43,12 @@ def status():
 def set_threshold():
     data = request.get_json()
     if data and 'threshold' in data:
-        detector.ALARM_THRESHOLD = int(data['threshold'])
-        print(f"阈值已更新: {detector.ALARM_THRESHOLD}")
-        return jsonify({'status': 'ok', 'threshold': detector.ALARM_THRESHOLD})
+        red = int(data['threshold'])
+        warn = max(1, red - 2)
+        detector.ALARM_THRESHOLD_RED = red
+        detector.ALARM_THRESHOLD_WARN = warn
+        print(f"阈值已更新: 红色={red}, 黄色={warn}")
+        return jsonify({'status': 'ok', 'threshold': red, 'threshold_warn': warn})
     return jsonify({'status': 'error'}), 400
 
 
@@ -55,7 +60,7 @@ def manual_control():
         action = data['action']
         if action == 'alarm_on':
             detector.manual_alarm_active = True
-            tcp_broadcast("COUNT:0,ALARM:1\n")
+            tcp_broadcast("COUNT:0,ALARM:2\n")
             return jsonify({'status': 'ok', 'action': 'alarm_on'})
         elif action == 'alarm_off':
             detector.manual_alarm_active = False

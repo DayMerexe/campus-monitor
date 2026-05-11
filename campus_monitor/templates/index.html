@@ -231,12 +231,23 @@
             font-weight: 600;
             letter-spacing: 0.5px;
         }
-        .alarm-banner.active {
+        .alarm-banner.warn {
+            display: block;
+            background: rgba(245,182,76,0.08);
+            border: 1px solid rgba(245,182,76,0.15);
+            color: var(--amber);
+            animation: warn-glow 1.5s ease-in-out infinite;
+        }
+        .alarm-banner.red {
             display: block;
             background: rgba(255,90,90,0.08);
             border: 1px solid rgba(255,90,90,0.15);
             color: var(--red);
             animation: alarm-glow 1.5s ease-in-out infinite;
+        }
+        @keyframes warn-glow {
+            0%, 100% { box-shadow: 0 0 16px rgba(245,182,76,0.04); }
+            50% { box-shadow: 0 0 32px rgba(245,182,76,0.1); }
         }
         @keyframes alarm-glow {
             0%, 100% { box-shadow: 0 0 16px rgba(255,90,90,0.04); }
@@ -316,6 +327,7 @@
                 <input type="number" id="thresholdInput" value="5" min="1" max="100"
                        onfocus="editingThreshold=true" onblur="editingThreshold=false">
                 <button class="btn-set" onclick="setThreshold()">设置</button>
+                <span style="font-size:11px;color:var(--text-dim);">黄<span style="color:var(--amber);font-weight:600;" id="thresholdWarnDisplay">3</span> / 红<span style="color:var(--red);font-weight:600;" id="thresholdRedDisplay">5</span></span>
                 <div class="sep"></div>
                 <button class="btn-alarm-on" onclick="manualAlarm('alarm_on')">⚠️ 报警</button>
                 <button class="btn-alarm-off" onclick="manualAlarm('alarm_off')">解除</button>
@@ -452,10 +464,16 @@
 
                 const alarmEl = document.getElementById('alarmDisplay');
                 const banner = document.getElementById('alarmBanner');
-                if (data.alarm) {
-                    alarmEl.textContent = '⚠️ 报警中';
+                if (data.alarm_level === 2) {
+                    alarmEl.textContent = '🔴 红色报警';
                     alarmEl.className = 'value c2';
-                    banner.className = 'alarm-banner active';
+                    banner.className = 'alarm-banner red';
+                    banner.textContent = '🔴 红色警报！人数严重超标，请立即疏散！';
+                } else if (data.alarm_level === 1) {
+                    alarmEl.textContent = '⚠️ 黄色预警';
+                    alarmEl.className = 'value c3';
+                    banner.className = 'alarm-banner warn';
+                    banner.textContent = '⚠️ 黄色预警：人数接近阈值，请关注！';
                 } else {
                     alarmEl.textContent = '✅ 正常';
                     alarmEl.className = 'value c4';
@@ -465,6 +483,11 @@
                 if (!editingThreshold) {
                     document.getElementById('thresholdInput').value = data.threshold;
                 }
+                // 显示黄色/红色阈值
+                const warnEl = document.getElementById('thresholdWarnDisplay');
+                const redEl = document.getElementById('thresholdRedDisplay');
+                if (warnEl) warnEl.textContent = data.threshold_warn;
+                if (redEl) redEl.textContent = data.threshold;
             })
             .catch(() => {});
     }
@@ -477,7 +500,11 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ threshold: val })
         }).then(r => r.json()).then(d => {
-            if (d.status === 'ok') alert('阈值已设置为 ' + d.threshold);
+            if (d.status === 'ok') {
+                alert('红色阈值已设置为 ' + d.threshold + '，黄色阈值 = ' + d.threshold_warn);
+                document.getElementById('thresholdWarnDisplay').textContent = d.threshold_warn;
+                document.getElementById('thresholdRedDisplay').textContent = d.threshold;
+            }
         });
     }
 
