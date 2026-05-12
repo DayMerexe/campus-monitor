@@ -7,7 +7,8 @@ from flask import Flask, render_template, Response, jsonify, request
 
 from db import init_db, get_recent_records, get_alarm_events, get_today_stats
 import detector
-from tcp_server import tcp_server, tcp_broadcast
+from tcp_server import tcp_server, tcp_broadcast, broadcast, mqtt_init
+import tcp_server  # 用于访问 tcp_server.stm32_connected
 
 app = Flask(__name__)
 
@@ -35,7 +36,8 @@ def status():
         'fps': round(detector.current_fps, 1),
         'today_detections': stats['total_detections'],
         'today_alarms': stats['alarm_count'],
-        'peak_count': stats['peak_count']
+        'peak_count': stats['peak_count'],
+        'stm32_online': tcp_server.stm32_connected
     })
 
 
@@ -60,11 +62,11 @@ def manual_control():
         action = data['action']
         if action == 'alarm_on':
             detector.manual_alarm_active = True
-            tcp_broadcast("COUNT:0,ALARM:2\n")
+            broadcast("COUNT:0,ALARM:2\n")
             return jsonify({'status': 'ok', 'action': 'alarm_on'})
         elif action == 'alarm_off':
             detector.manual_alarm_active = False
-            tcp_broadcast("COUNT:0,ALARM:0\n")
+            broadcast("COUNT:0,ALARM:0\n")
             return jsonify({'status': 'ok', 'action': 'alarm_off'})
     return jsonify({'status': 'error'}), 400
 
@@ -86,6 +88,7 @@ def alarms():
 if __name__ == '__main__':
     init_db()
     print("✅ 数据库已初始化")
+    mqtt_init()
 
     t1 = threading.Thread(target=detector.detect_loop, daemon=True)
     t2 = threading.Thread(target=tcp_server, daemon=True)

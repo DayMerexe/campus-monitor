@@ -24,10 +24,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define WIFI_SSID  "test"
-#define WIFI_PASS  "wxh708023"
-#define TCP_IP     "192.168.4.140"
-#define TCP_PORT   8888
+/* MQTT 模式，无需 AT 指令，配置由 ESP8266 固件管理 */
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -100,7 +97,7 @@ int main(void)
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);  /* 蜂鸣器关 */
 
-  /* 启动闪烁：LED0 闪 3 次 */
+  /* 启动闪烁：DS2 红灯闪 3 次 */
   for (int i = 0; i < 3; i++) {
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
     HAL_Delay(100);
@@ -108,20 +105,10 @@ int main(void)
     HAL_Delay(100);
   }
 
-  HAL_Delay(2000);
-  HAL_UART_Transmit(&huart2, (uint8_t*)"AT\r\n", 4, 100);
-  HAL_Delay(500);
-
-  /* ESP8266 上电自连 WiFi，只需连 TCP 即可 */
-  HAL_UART_Transmit(&huart2, (uint8_t*)"AT+CIPSTART=\"TCP\",\"192.168.4.140\",8888\r\n", 43, 500);
+  /* 等待 ESP8266 完成 MQTT 初始化 */
   HAL_Delay(4000);
 
-  HAL_UART_Transmit(&huart2, (uint8_t*)"AT+CIPMODE=1\r\n", 14, 100);
-  HAL_Delay(500);
-  HAL_UART_Transmit(&huart2, (uint8_t*)"AT+CIPSEND\r\n", 13, 100);
-  HAL_Delay(500);
-
-  /* 清空 USART2 缓冲区中的 AT 回复残渣 */
+  /* 清空 USART2 缓冲区（ESP8266 启动时可能发的杂讯） */
   {
     uint8_t dump;
     while (HAL_UART_Receive(&huart2, &dump, 1, 2) == HAL_OK) {}

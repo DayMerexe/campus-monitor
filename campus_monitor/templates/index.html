@@ -309,6 +309,7 @@
             <div class="subtitle">Campus Crowd Monitoring &amp; Emergency Alert System</div>
         </div>
         <div class="top-right">
+            <div class="fps-badge" id="stm32Status" style="color:var(--text-dim);">○ STM32 离线</div>
             <div class="fps-badge" id="fpsDisplay">FPS: --</div>
         </div>
     </div>
@@ -461,6 +462,16 @@
                 document.getElementById('fpsDisplay').textContent = 'FPS: ' + data.fps;
                 document.getElementById('totalDet').textContent = data.today_detections;
                 document.getElementById('alarmStats').textContent = data.today_alarms + ' / ' + data.peak_count;
+
+                // STM32 连接状态
+                const statusEl = document.getElementById('stm32Status');
+                if (data.stm32_online) {
+                    statusEl.textContent = '● STM32 在线';
+                    statusEl.style.color = '#5ddb8f';
+                } else {
+                    statusEl.textContent = '○ STM32 离线';
+                    statusEl.style.color = 'var(--text-dim)';
+                }
 
                 const alarmEl = document.getElementById('alarmDisplay');
                 const banner = document.getElementById('alarmBanner');

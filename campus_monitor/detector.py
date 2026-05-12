@@ -10,10 +10,10 @@ import torch
 from ultralytics import YOLO
 
 from db import init_db, insert_detection, start_alarm, end_alarm
-from tcp_server import tcp_broadcast
+from tcp_server import broadcast, tcp_broadcast
 
 # 配置
-ESP32_CAM_URL = "http://192.168.4.121:81/stream"
+ESP32_CAM_URL = "http://192.168.4.183:81/stream"
 CONFIDENCE_THRESHOLD = 0.5
 PERSON_CLASS_ID = 0
 
@@ -164,11 +164,12 @@ def detect_loop():
                 with frame_lock:
                     annotated_frame = annotated
 
-                # TCP 发送给 STM32（手动报警期间跳过自动发送）
-                # 限制频率：最多 2 次/秒，避免洪水冲垮 STM32 的 UART 轮询
+                # 广播给 STM32（最多 2 次/秒）
+                # 手动报警期间，自动广播也发 ALARM:2，防止竞态条件导致 ALARM:0 覆盖手动报警
                 now2 = time.time()
-                if not manual_alarm_active and (now2 - last_tcp_send >= 0.5):
-                    tcp_broadcast(f"COUNT:{count},ALARM:{alarm_level}\n")
+                if now2 - last_tcp_send >= 0.5:
+                    send_level = 2 if manual_alarm_active else alarm_level
+                    broadcast(f"COUNT:{count},ALARM:{send_level}\n")
                     last_tcp_send = now2
 
                 # 约每 2 秒写一条 DB 记录
