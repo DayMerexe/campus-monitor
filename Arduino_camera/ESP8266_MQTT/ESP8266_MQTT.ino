@@ -1,7 +1,6 @@
 /*
   ESP8266 MQTT 透传固件
-  从 MQTT 接收报警指令，通过 UART 转发给 STM32
-  STM32 端完全不用改
+  双向通信：从 MQTT 接收报警指令转发给 STM32，同时从 STM32 接收火焰传感器状态上传 MQTT
 
   LED 状态指示（ESP-01 内置 LED，低电平亮）：
     常亮    → 上电/等待 WiFi
@@ -28,6 +27,7 @@ const char* mqtt_server = "broker-cn.emqx.io";
 const int mqtt_port = 1883;
 const char* mqtt_topic = "bishe/99257/alarm";
 const char* status_topic = "bishe/99257/status";
+const char* flame_topic = "bishe/99257/flame";
 const char* mqtt_client_id = "esp8266_bishe_01";
 
 WiFiClient wifiClient;
@@ -101,7 +101,7 @@ void setup() {
 
   Serial.begin(115200);
 
-  // 延时等待 STM32 完成 AT 初始化 + 清空缓冲区
+  // 延时等待 STM32 初始化
   delay(3000);
 
   WiFi.mode(WIFI_STA);
@@ -110,7 +110,6 @@ void setup() {
   int retry = 0;
   while (WiFi.status() != WL_CONNECTED && retry < 30) {
     delay(500);
-    // WiFi 连接中，LED 保持常亮（LED_INIT 状态）
     retry++;
   }
 
@@ -129,7 +128,7 @@ void setup() {
 
 
 void loop() {
-  update_led();  // 非阻塞 LED 控制
+  update_led();
 
   if (!client.connected()) {
     connectMQTT();
@@ -138,4 +137,13 @@ void loop() {
     }
   }
   client.loop();
+
+  // 转发 STM32 发来的数据到 MQTT（火焰传感器状态等）
+  if (Serial.available()) {
+    String line = Serial.readStringUntil('\n');
+    line.trim();
+    if (line.length() > 0 && client.connected()) {
+      client.publish(flame_topic, line.c_str());
+    }
+  }
 }

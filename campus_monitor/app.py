@@ -37,7 +37,8 @@ def status():
         'today_detections': stats['total_detections'],
         'today_alarms': stats['alarm_count'],
         'peak_count': stats['peak_count'],
-        'stm32_online': tcp_server.stm32_connected
+        'stm32_online': tcp_server.stm32_connected,
+        'flame_active': tcp_server.flame_active
     })
 
 

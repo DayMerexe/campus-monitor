@@ -37,12 +37,19 @@
 /* USER CODE BEGIN PV */
 char     rx_buf[64];
 uint8_t  rx_idx = 0;
+uint8_t  flame_alarm = 0;    // 火焰传感器报警（独立于 MQTT）
+uint8_t  flame_debounce = 0; // 火焰防抖计数器
+uint8_t  gate_open = 0;      // 闸门是否已开
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-
+void servo_stop(void);
+void servo_open_gate(void);
+void servo_close_gate(void);
+void servo_tick(void);
+void set_outputs(int level);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -92,6 +99,32 @@ int main(void)
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
   }
 
+  /* PA0 火焰传感器输入 */
+  {
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin   = GPIO_PIN_0;
+    GPIO_InitStruct.Mode  = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull  = GPIO_PULLUP;  /* 火焰传感器 DO 低电平有效 */
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  }
+
+  /* TIM3 PWM 舵机 (PA6) — 直接寄存器操作 */
+  RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;  /* 开 TIM3 时钟 */
+  {
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin       = GPIO_PIN_6;
+    GPIO_InitStruct.Mode      = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Speed     = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  }
+  TIM3->PSC   = 128 - 1;           /* 64MHz/128 = 500kHz */
+  TIM3->ARR   = 10000 - 1;         /* 500kHz/10000 = 50Hz  */
+  TIM3->CCR1  = 750;               /* 1.5ms = 停止      */
+  TIM3->CCMR1 = TIM_CCMR1_OC1M_1 | TIM_CCMR1_OC1M_2;  /* PWM 模式 1 */
+  TIM3->CCER  = TIM_CCER_CC1E;     /* 使能 CH1 输出 */
+  TIM3->CR1   = TIM_CR1_ARPE;      /* 自动重载预装载 */
+  TIM3->CR1  |= TIM_CR1_CEN;       /* 启动定时器 */
+
   /* LED 默认关闭（RESET=亮, SET=灭，低电平有效） */
   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_5, GPIO_PIN_SET);
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
@@ -133,41 +166,55 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    /* 按行解析 USART2（ESP8266），每条消息独立，一条坏不影响下一条 */
+    servo_tick();  /* 非阻塞舵机状态更新 */
+
+    /* ── 火焰传感器检测（PA0，低电平有效）── */
+    {
+      static uint32_t last_flame_check = 0;
+      uint32_t now = HAL_GetTick();
+      if (now - last_flame_check >= 100) {  /* 每 100ms 检测一次 */
+        last_flame_check = now;
+        uint8_t raw = (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET);
+        if (raw) {
+          if (flame_debounce < 3) flame_debounce++;
+          if (flame_debounce >= 3 && !flame_alarm) {
+            flame_alarm = 1;
+            set_outputs(2);        /* 红灯+蜂鸣器+黄灯 */
+            servo_open_gate();
+            HAL_UART_Transmit(&huart2, (uint8_t*)"FLAME:1\n", 8, 100);
+          }
+        } else {
+          if (flame_debounce > 0) flame_debounce--;
+          if (flame_debounce == 0 && flame_alarm) {
+            flame_alarm = 0;
+            set_outputs(0);        /* 恢复正常 */
+            servo_close_gate();
+            HAL_UART_Transmit(&huart2, (uint8_t*)"FLAME:0\n", 8, 100);
+          }
+        }
+      }
+    }
+
+    /* ── MQTT 消息解析（USART2 ← ESP8266）── */
     uint8_t ch;
     if (HAL_UART_Receive(&huart2, &ch, 1, 1) == HAL_OK) {
       if (ch == '\r') {
         /* 忽略 */
       } else if (ch == '\n') {
-        /* 一行结束，解析 */
         rx_buf[rx_idx] = '\0';
         if (rx_idx > 0) {
           int count = 0, alarm = 0;
           if (sscanf(rx_buf, "COUNT:%d,ALARM:%d", &count, &alarm) == 2) {
-            if (alarm == 0) {
-              /* 正常：全部关闭 */
-              HAL_GPIO_WritePin(GPIOE, GPIO_PIN_5, GPIO_PIN_SET);
-              HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
-              HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
-            } else if (alarm == 1) {
-              /* 黄色预警：黄灯慢闪，红灯/蜂鸣器关 */
-              HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_5);
-              HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
-              HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
-            } else if (alarm == 2) {
-              /* 红色报警：红灯亮 + 蜂鸣器响，黄灯常亮 */
-              HAL_GPIO_WritePin(GPIOE, GPIO_PIN_5, GPIO_PIN_RESET);
-              HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
-              HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
+            if (!flame_alarm) {  /* 火焰报警优先级最高，不覆盖 */
+              set_outputs(alarm);
             }
           }
         }
-        rx_idx = 0;  /* 清空行 buffer，下一条消息从 0 开始 */
+        rx_idx = 0;
       } else {
-        /* 普通字节，追加到行 buffer */
         HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_5);  /* DS0 翻转 = 收到字节 */
         rx_buf[rx_idx++] = ch;
-        if (rx_idx >= 63) rx_idx = 0;  /* 溢出保护 */
+        if (rx_idx >= 63) rx_idx = 0;
       }
     }
   /* USER CODE END 3 */
@@ -213,6 +260,55 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+/* ── 舵机控制（360° SG90, 50Hz PWM，非阻塞）── */
+/* CCR: 250=正转全速, 750=停止, 1250=反转全速 */
+
+static uint32_t servo_timer = 0;
+static uint8_t  servo_state = 0;  /* 0=空闲, 1=开门中, 2=关门中 */
+#define SERVO_DURATION 1200  /* 舵机动作持续 ms */
+
+void servo_stop(void) {
+  TIM3->CCR1 = 750;
+}
+void servo_open_gate(void) {
+  if (gate_open || servo_state) return;
+  gate_open = 1;
+  servo_state = 1;
+  servo_timer = HAL_GetTick();
+  TIM3->CCR1 = 300;
+}
+void servo_close_gate(void) {
+  if (!gate_open || servo_state) return;
+  gate_open = 0;
+  servo_state = 2;
+  servo_timer = HAL_GetTick();
+  TIM3->CCR1 = 1200;
+}
+/* 在主循环中调用，非阻塞检查舵机是否完成 */
+void servo_tick(void) {
+  if (servo_state && (HAL_GetTick() - servo_timer >= SERVO_DURATION)) {
+    servo_state = 0;
+    TIM3->CCR1 = 750;
+  }
+}
+
+/* ── 统一输出：LED + 蜂鸣器 ── */
+void set_outputs(int level) {
+  if (level == 0) {
+    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_5, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
+  } else if (level == 1) {
+    HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_5);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
+  } else {
+    /* level == 2: 红色报警 */
+    HAL_GPIO_WritePin(GPIOE, GPIO_PIN_5, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
+  }
+}
 /* USER CODE END 4 */
 
 /**

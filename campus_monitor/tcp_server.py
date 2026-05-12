@@ -16,11 +16,13 @@ MQTT_BROKER = "broker-cn.emqx.io"
 MQTT_PORT = 1883
 MQTT_TOPIC = "bishe/99257/alarm"
 MQTT_STATUS_TOPIC = "bishe/99257/status"
+MQTT_FLAME_TOPIC = "bishe/99257/flame"
 MQTT_CLIENT_ID = "bishe_server_01"
 
 mqtt_client = None
 mqtt_ready = False
 stm32_connected = False  # STM32(ESP8266) 是否在线
+flame_active = False      # 火焰传感器是否触发
 
 
 def on_mqtt_connect(client, userdata, flags, reason_code, properties=None):
@@ -28,6 +30,7 @@ def on_mqtt_connect(client, userdata, flags, reason_code, properties=None):
     if reason_code == 0:
         mqtt_ready = True
         client.subscribe(MQTT_STATUS_TOPIC, qos=1)
+        client.subscribe(MQTT_FLAME_TOPIC, qos=1)
         print(f"✅ MQTT 已连接 ({MQTT_BROKER})")
     else:
         mqtt_ready = False
@@ -45,7 +48,7 @@ def on_mqtt_disconnect(client, userdata, flags, reason_code, properties=None):
 
 def on_mqtt_message(client, userdata, msg):
     """收到 MQTT 消息的回调"""
-    global stm32_connected
+    global stm32_connected, flame_active
     topic = msg.topic
     payload = msg.payload.decode()
     if topic == MQTT_STATUS_TOPIC:
@@ -57,6 +60,13 @@ def on_mqtt_message(client, userdata, msg):
             if stm32_connected:
                 print("⚠️ STM32(ESP8266) 已离线")
             stm32_connected = False
+    elif topic == MQTT_FLAME_TOPIC:
+        if payload.startswith("FLAME:1") and not flame_active:
+            flame_active = True
+            print("🔥 火焰传感器触发！")
+        elif payload.startswith("FLAME:0") and flame_active:
+            flame_active = False
+            print("🔥 火焰传感器恢复正常")
 
 
 def mqtt_broadcast(msg):
