@@ -47,7 +47,7 @@ def set_threshold():
     data = request.get_json()
     if data and 'threshold' in data:
         red = int(data['threshold'])
-        warn = max(1, red - 2)
+        warn = max(1, int(red * 0.8))
         detector.ALARM_THRESHOLD_RED = red
         detector.ALARM_THRESHOLD_WARN = warn
         print(f"阈值已更新: 红色={red}, 黄色={warn}")

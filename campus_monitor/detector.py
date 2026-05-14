@@ -61,7 +61,8 @@ def detect_loop():
     # 报警防抖参数
     ALARM_CONFIRM = 3       # 连续确认帧数
     ALARM_LOCK = 3.0        # 状态切换后锁定秒数
-    consecutive = 0          # 单计数器，统计连续偏离目标等级的帧数
+    consecutive = 0          # 连续偏离当前等级的帧数（正向）
+    normal_frames = 0        # 连续回到当前等级的帧数（反向），用于重置正向计数器
     last_state_change = 0.0
 
     while True:
@@ -115,16 +116,18 @@ def detect_loop():
                 now = time.time()
                 locked = (now - last_state_change) < ALARM_LOCK
 
-                # 三级报警防抖：当前等级 ≠ 目标等级时累加计数器
+                # 三级报警防抖：对称确认，波动不互相干扰
                 old_level = alarm_level
                 target = get_target_level(count)
                 if target != old_level and not locked:
                     consecutive += 1
+                    normal_frames = 0
                     if consecutive >= ALARM_CONFIRM:
                         alarm_level = target
                         alarm_active = (target > 0)
                         last_state_change = now
                         consecutive = 0
+                        normal_frames = 0
 
                         if target > 0 and old_level == 0:
                             # 从正常进入报警
@@ -141,8 +144,11 @@ def detect_loop():
                             print(f"✅ 报警解除。峰值: {alarm_max_count}")
                             alarm_event_id = None
                             alarm_max_count = 0
-                else:
-                    consecutive = 0
+                elif target == old_level:
+                    normal_frames += 1
+                    if normal_frames >= ALARM_CONFIRM:
+                        consecutive = 0
+                        normal_frames = 0
 
                 # 报警期间跟踪峰值
                 if alarm_active and count > alarm_max_count:
