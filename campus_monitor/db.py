@@ -16,7 +16,7 @@ def get_conn():
 
 
 def init_db():
-    """建表（幂等，重复调用不报错）"""
+    """建表 + 迁移（幂等）"""
     with get_conn() as conn:
         conn.executescript('''
             CREATE TABLE IF NOT EXISTS detection_records (
@@ -36,6 +36,11 @@ def init_db():
                 duration   REAL
             );
         ''')
+        # 兼容旧库：如果旧表缺 level 列，自动补上
+        cols = [row[1] for row in conn.execute('PRAGMA table_info(alarm_events)').fetchall()]
+        if 'level' not in cols:
+            conn.execute('ALTER TABLE alarm_events ADD COLUMN level INTEGER NOT NULL DEFAULT 1')
+            print("✅ 数据库迁移: alarm_events 已添加 level 列")
 
 
 def insert_detection(count, alarm, fps):

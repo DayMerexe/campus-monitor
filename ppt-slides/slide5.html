@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+html { background: #1e1e2e; }
+body {
+  width: 720pt; height: 405pt; margin: 0; padding: 0;
+  background: #1e1e2e; font-family: Arial, sans-serif;
+  display: flex; flex-direction: column;
+}
+.header-bar { background: #1a56db; padding: 18pt 40pt; margin: 0; }
+.header-bar h2 { color: #FFFFFF; font-size: 26pt; margin: 0; }
+.content { margin: 14pt 40pt; display: flex; gap: 18pt; }
+.col { flex: 1; }
+.chip-card {
+  background: #2a2a3e; padding: 10pt 14pt; border-radius: 4pt;
+  margin-bottom: 10pt; border-top: 3pt solid #64a8ff;
+}
+.chip-card h4 { color: #64a8ff; font-size: 12pt; margin: 0 0 4pt 0; }
+.chip-card p { color: #CCC; font-size: 9pt; margin: 0 0 2pt 0; }
+.wiring-box {
+  background: #2a2a3e; padding: 8pt 12pt; border-radius: 4pt;
+  border-left: 3pt solid #1a56db;
+}
+.wiring-box p { color: #64a8ff; font-size: 8pt; margin: 0; font-family: Courier New, monospace; }
+</style>
+</head>
+<body>
+<div class="header-bar"><h2>硬件设计与实现</h2></div>
+<div class="content">
+  <div class="col">
+    <div class="chip-card">
+      <h4>STM32F103ZET6</h4>
+      <p>64MHz, HAL, Keil MDK-ARM</p>
+      <p>USART1+USART2+GPIO</p>
+    </div>
+    <div class="chip-card">
+      <h4>ESP32-CAM</h4>
+      <p>OV2640, MJPEG 推流</p>
+      <p>QVGA 320x240, XCLK 20MHz</p>
+    </div>
+    <div class="chip-card">
+      <h4>ESP8266 ESP-01S</h4>
+      <p>AT 固件, 透明传输</p>
+      <p>TCP Client :8888</p>
+    </div>
+  </div>
+  <div class="col">
+    <div class="wiring-box">
+      <p>STM32 PA2(TX) - ESP8266 RX</p>
+      <p>STM32 PA3(RX) - ESP8266 TX</p>
+    </div>
+    <p style="color:#AAA;font-size:8pt;margin:6pt 0;">UART 115200 8N1</p>
+    <div class="wiring-box" style="margin-top:8pt;">
+      <p>PE5: LED  / PB5: ALARM</p>
+      <p>PB8: Buzzer (Active High)</p>
+      <p>PA9/PA10: CH340 Debug</p>
+    </div>
+    <p style="color:#AAA;font-size:8pt;margin:6pt 0;">GPIO Pin Assignments</p>
+  </div>
+</div>
+</body>
+</html>

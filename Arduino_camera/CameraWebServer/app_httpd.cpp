@@ -19,14 +19,16 @@
 #include "esp32-hal-ledc.h"
 #include "sdkconfig.h"
 #include "camera_index.h"
+#include <lwip/sockets.h>  // TCP_NODELAY 需要
 
 #if defined(ARDUINO_ARCH_ESP32) && defined(CONFIG_ARDUHAL_ESP_LOG)
 #include "esp32-hal-log.h"
 #endif
 
 // Face Detection will not work on boards without (or with disabled) PSRAM
+// 帧率优化：强制禁用人脸检测，消除热路径分支和固件体积膨胀
 #ifdef BOARD_HAS_PSRAM
-#define CONFIG_ESP_FACE_DETECT_ENABLED 1
+#define CONFIG_ESP_FACE_DETECT_ENABLED 0
 // Face Recognition takes upward from 15 seconds per frame on chips other than ESP32S3
 // Makes no sense to have it enabled for them
 #if CONFIG_IDF_TARGET_ESP32S3
@@ -90,8 +92,8 @@ typedef struct
 
 #define PART_BOUNDARY "123456789000000000000987654321"
 static const char *_STREAM_CONTENT_TYPE = "multipart/x-mixed-replace;boundary=" PART_BOUNDARY;
-static const char *_STREAM_BOUNDARY = "\r\n--" PART_BOUNDARY "\r\n";
-static const char *_STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %u\r\nX-Timestamp: %d.%06d\r\n\r\n";
+// 帧率优化：boundary 合并到 _STREAM_PART，减少一次 send_chunk
+static const char *_STREAM_PART = "\r\n--" PART_BOUNDARY "\r\nContent-Type: image/jpeg\r\nContent-Length: %u\r\nX-Timestamp: %d.%06d\r\n\r\n";
 
 httpd_handle_t stream_httpd = NULL;
 httpd_handle_t camera_httpd = NULL;
@@ -524,7 +526,7 @@ static esp_err_t stream_handler(httpd_req_t *req)
     esp_err_t res = ESP_OK;
     size_t _jpg_buf_len = 0;
     uint8_t *_jpg_buf = NULL;
-    char *part_buf[128];
+    char part_buf[256];  // 修正：原为 char *part_buf[128] 类型错误
 #if CONFIG_ESP_FACE_DETECT_ENABLED
     #if ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_INFO
         bool detected = false;
@@ -560,6 +562,13 @@ static esp_err_t stream_handler(httpd_req_t *req)
 
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
     httpd_resp_set_hdr(req, "X-Framerate", "60");
+
+    // 禁用 Nagle：MJPEG 每帧立即发送
+    int sockfd = httpd_req_to_sockfd(req);
+    if (sockfd >= 0) {
+        int flag = 1;
+        lwip_setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
+    }
 
 #if CONFIG_LED_ILLUMINATOR_ENABLED
     isStreaming = true;
@@ -726,18 +735,22 @@ static esp_err_t stream_handler(httpd_req_t *req)
             }
 #endif
         }
-        if (res == ESP_OK)
-        {
-            res = httpd_resp_send_chunk(req, _STREAM_BOUNDARY, strlen(_STREAM_BOUNDARY));
-        }
-        if (res == ESP_OK)
-        {
-            size_t hlen = snprintf((char *)part_buf, 128, _STREAM_PART, _jpg_buf_len, _timestamp.tv_sec, _timestamp.tv_usec);
-            res = httpd_resp_send_chunk(req, (const char *)part_buf, hlen);
-        }
-        if (res == ESP_OK)
-        {
-            res = httpd_resp_send_chunk(req, (const char *)_jpg_buf, _jpg_buf_len);
+        // 帧率优化：boundary+header+JPEG 合并为单次发送，消除 Nagle 延迟
+        size_t hlen = snprintf(part_buf, sizeof(part_buf), _STREAM_PART,
+                               _jpg_buf_len, _timestamp.tv_sec, _timestamp.tv_usec);
+        size_t total = hlen + _jpg_buf_len;
+        char *combined = (char*)malloc(total);
+        if (combined) {
+            memcpy(combined, part_buf, hlen);
+            memcpy(combined + hlen, _jpg_buf, _jpg_buf_len);
+            res = httpd_resp_send_chunk(req, combined, total);
+            free(combined);
+        } else {
+            // malloc 失败时回退到 header + JPEG 两次发送
+            res = httpd_resp_send_chunk(req, part_buf, hlen);
+            if (res == ESP_OK) {
+                res = httpd_resp_send_chunk(req, (const char *)_jpg_buf, _jpg_buf_len);
+            }
         }
         if (fb)
         {

@@ -4,29 +4,22 @@
 毕设：应急场景下的校园人流量监控管理系统。双输入：ESP32-CAM + YOLOv8（远程AI）和火焰传感器（本地应急）。
 
 ## 当前状态
-_更新于 2026-05-12_
-- [论文]: 第1-2章已生成，第3-4章待生成（详见 docs/PROGRESS.md）
-- [PPT]: 11页中期答辩PPT已完成
-- [硬件]: 火焰传感器+舵机+MQTT通信完成，待实物联调
+_更新于 2026-05-15_
+- [硬件]: ESP32-CAM 固件帧率优化（quality 20→12, grab_mode→LATEST）详见 docs/PROGRESS.md
+- [后端]: 连接池耗尽修复 + 对称防抖 + MQTT按需发送 (commit `913bf87`)
+- [前端]: 轮询合并为 /dashboard，连接数减半
 
 ## 运行命令
-
-```bash
-cd F:\bishe\campus_monitor
-/c/Users/DayMer/miniconda3/python.exe app.py  # → http://localhost:5000
-cd /f/bishe && git ...
-```
+`cd F:\bishe\campus_monitor && /c/Users/DayMer/miniconda3/python.exe app.py` → http://localhost:5000
 
 ## 项目结构
+`campus_monitor/` (主版本) | `Arduino_camera/` (ESP32/ESP8266) | `stm32_serial_led/` (STM32) | `ppt-slides/` (PPT)
 
-```
-campus_monitor/            # 主版本
-  app.py / detector.py / db.py / tcp_server.py
-  templates/index.html     # 仪表盘
-Arduino_camera/            # ESP32-CAM + ESP8266 固件
-stm32_serial_led/          # STM32F103ZET6 固件
-ppt-slides/                # 答辩PPT源码
-```
+## 协作流程
+- **主对话**：架构决策 + diff 审查 + 合并执行 + 进度管理
+- **子对话**：帧率优化 / 数据传输修复，产出 `_fixed` 完整副本
+- 子对话读入口文档获取上下文，完成后更新"协作进度"段落
+- 合并流程 & 启动模板详见 `docs/协作流程.md`
 
 ## 架构决策
 - 双输入通道：远程AI（YOLO） + 本地应急（火焰传感器，不依赖网络）
@@ -34,11 +27,16 @@ ppt-slides/                # 答辩PPT源码
 - 三级报警+火焰防抖，详见 docs/architecture.md
 
 ## 待办事项
+- [ ] 烧录新 ESP32-CAM 固件（需实物操作）
+- [ ] 火焰传感器+舵机实物联调
+- [ ] 多场景模拟（MP4 替代摄像头）
 - [ ] 论文第3章（系统设计与实现）
 - [ ] 论文第4章（系统测试与分析）
-- [ ] 火焰传感器+舵机实物联调
-- [ ] ESP32-CAM 归还后整体联调
-- [ ] 图表切换 ECharts
+- 数据传输修复 → 子对话处理，见 `docs/传输修复指南.md`
+- 帧率优化 → 子对话处理，见 `docs/ESP32-CAM帧率问题.md`
+
+## 已知问题
+- [ ] /video_feed 浏览器重连导致连接池泄漏，运行中 HTTP 请求卡死
 
 ## 技术栈
 Python: Flask, PyTorch, YOLOv8, OpenCV, paho-mqtt | Arduino: ESP8266WiFi, PubSubClient | STM32: HAL UART/GPIO, TIM3 PWM | 前端: Chart.js, 原生 JS
@@ -46,7 +44,11 @@ Python: Flask, PyTorch, YOLOv8, OpenCV, paho-mqtt | Arduino: ESP8266WiFi, PubSub
 ## 参考文档
 | 文档 | 内容 |
 |------|------|
+| [协作流程](docs/协作流程.md) | 多对话并行协作规范 |
 | [系统架构](docs/architecture.md) | 通信协议、三级报警、实现细节 |
-| [硬件引脚](docs/hardware.md) | STM32 引脚定义、固件文件 |
-| [文档写作](docs/writing.md) | 论文格式、PPT 工作流 |
+| [传输修复指南](docs/传输修复指南.md) | 修复清单 + 合并步骤 |
+| [帧率问题](docs/ESP32-CAM帧率问题.md) | ESP32-CAM 帧率分析+优化（子对话A入口） |
+| [传输问题](docs/数据传输问题总结.md) | HTTP/MQTT/DB 传输汇总（子对话B入口） |
 | [进度日志](docs/PROGRESS.md) | 完整开发进度 |
+| [硬件引脚](docs/hardware.md) | STM32 引脚定义 |
+| [文档写作](docs/writing.md) | 论文格式、PPT 工作流 |

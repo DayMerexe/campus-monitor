@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+html { background: #1e1e2e; }
+body {
+  width: 720pt; height: 405pt; margin: 0; padding: 0;
+  background: #1e1e2e; font-family: Arial, sans-serif;
+  display: flex; flex-direction: column;
+}
+.header-bar { background: #1a56db; padding: 18pt 40pt; margin: 0; }
+.header-bar h2 { color: #FFFFFF; font-size: 26pt; margin: 0; }
+.content { margin: 18pt 40pt; display: flex; gap: 24pt; }
+.col { flex: 1; }
+.section-title { margin: 0 0 10pt 0;
+  border-bottom: 2pt solid #1a56db; padding-bottom: 4pt; }
+.section-title p { color: #64a8ff; font-size: 13pt; font-weight: bold; margin: 0; }
+.done { color: #4ECB71; font-size: 11pt; margin: 0 0 6pt 0; }
+.todo { color: #FFB347; font-size: 11pt; margin: 0 0 6pt 0; }
+.num { color: #64a8ff; font-weight: bold; }
+</style>
+</head>
+<body>
+<div class="header-bar"><h2>总结与展望</h2></div>
+<div class="content">
+  <div class="col">
+    <div class="section-title"><p>已完成工作</p></div>
+    <p class="done"><span class="num">1.</span> ESP32-CAM 视频采集与 MJPEG 推流</p>
+    <p class="done"><span class="num">2.</span> YOLOv8 行人检测模型部署与推理</p>
+    <p class="done"><span class="num">3.</span> Flask Web 可视化仪表盘</p>
+    <p class="done"><span class="num">4.</span> TCP + ESP8266 + STM32 报警链路</p>
+    <p class="done"><span class="num">5.</span> 报警防抖、阈值调节、历史记录</p>
+  </div>
+  <div class="col">
+    <div class="section-title"><p>下一步计划</p></div>
+    <p class="todo"><span class="num">1.</span> 校园场景数据集微调, 提升精度</p>
+    <p class="todo"><span class="num">2.</span> 支持多摄像头同时监测</p>
+    <p class="todo"><span class="num">3.</span> 短信/邮件远程报警通知</p>
+    <p class="todo"><span class="num">4.</span> 部署到 Jetson Nano 等嵌入式平台</p>
+  </div>
+</div>
+</body>
+</html>

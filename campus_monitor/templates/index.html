@@ -411,60 +411,17 @@
         }
     });
 
-    function updateChart() {
-        fetch('/history')
+    function updateDashboard() {
+        fetch('/dashboard')
             .then(r => r.json())
-            .then(rows => {
-                chart.data.labels = rows.map(r => {
-                    const t = r.timestamp.split('T')[1];
-                    return t ? t.substring(0, 5) : '';
-                });
-                chart.data.datasets[0].data = rows.map(r => r.count);
-                chart.update('none');
-            })
-            .catch(() => {});
-    }
+            .then(d => {
+                const data = d.status;
 
-    function updateAlarmTable() {
-        fetch('/alarms')
-            .then(r => r.json())
-            .then(rows => {
-                const wrap = document.getElementById('alarmTableWrap');
-                if (!rows.length) {
-                    wrap.innerHTML = '<div class="empty-hint">暂无报警记录</div>';
-                    return;
-                }
-                let html = '<table class="alarm-table">'
-                    + '<tr><th>开始时间</th><th>结束时间</th><th>峰值人数</th><th>持续时长</th></tr>';
-                rows.forEach(r => {
-                    const start = r.start_time.split('T')[1] || r.start_time;
-                    const end = r.end_time
-                        ? r.end_time.split('T')[1] || r.end_time
-                        : '<span class="ongoing">进行中</span>';
-                    const dur = r.duration != null ? r.duration + 's' : '-';
-                    html += `<tr>
-                        <td>${start.substring(0,8)}</td>
-                        <td>${end.substring(0,8)}</td>
-                        <td>${r.max_count}</td>
-                        <td>${dur}</td>
-                    </tr>`;
-                });
-                html += '</table>';
-                wrap.innerHTML = html;
-            })
-            .catch(() => {});
-    }
-
-    function updateStatus() {
-        fetch('/status')
-            .then(r => r.json())
-            .then(data => {
                 document.getElementById('countDisplay').textContent = data.count;
                 document.getElementById('fpsDisplay').textContent = 'FPS: ' + data.fps;
                 document.getElementById('totalDet').textContent = data.today_detections;
                 document.getElementById('alarmStats').textContent = data.today_alarms + ' / ' + data.peak_count;
 
-                // STM32 连接状态
                 const statusEl = document.getElementById('stm32Status');
                 if (data.stm32_online) {
                     statusEl.textContent = '● STM32 在线';
@@ -474,7 +431,6 @@
                     statusEl.style.color = 'var(--text-dim)';
                 }
 
-                // 火焰传感器状态
                 const flameEl = document.getElementById('flameStatus');
                 if (data.flame_active) {
                     flameEl.style.display = 'inline-block';
@@ -504,11 +460,44 @@
                 if (!editingThreshold) {
                     document.getElementById('thresholdInput').value = data.threshold;
                 }
-                // 显示黄色/红色阈值
                 const warnEl = document.getElementById('thresholdWarnDisplay');
                 const redEl = document.getElementById('thresholdRedDisplay');
                 if (warnEl) warnEl.textContent = data.threshold_warn;
                 if (redEl) redEl.textContent = data.threshold;
+
+                // 折线图
+                const rows = d.history;
+                chart.data.labels = rows.map(r => {
+                    const t = r.timestamp.split('T')[1];
+                    return t ? t.substring(0, 5) : '';
+                });
+                chart.data.datasets[0].data = rows.map(r => r.count);
+                chart.update('none');
+
+                // 报警历史
+                const alarmRows = d.alarms;
+                const wrap = document.getElementById('alarmTableWrap');
+                if (!alarmRows.length) {
+                    wrap.innerHTML = '<div class="empty-hint">暂无报警记录</div>';
+                } else {
+                    let html = '<table class="alarm-table">'
+                        + '<tr><th>开始时间</th><th>结束时间</th><th>峰值人数</th><th>持续时长</th></tr>';
+                    alarmRows.forEach(r => {
+                        const start = r.start_time.split('T')[1] || r.start_time;
+                        const end = r.end_time
+                            ? r.end_time.split('T')[1] || r.end_time
+                            : '<span class="ongoing">进行中</span>';
+                        const dur = r.duration != null ? r.duration + 's' : '-';
+                        html += '<tr>'
+                            + '<td>' + start.substring(0,8) + '</td>'
+                            + '<td>' + end.substring(0,8) + '</td>'
+                            + '<td>' + r.max_count + '</td>'
+                            + '<td>' + dur + '</td>'
+                            + '</tr>';
+                    });
+                    html += '</table>';
+                    wrap.innerHTML = html;
+                }
             })
             .catch(() => {});
     }
@@ -553,13 +542,8 @@
         });
     }
 
-    setInterval(updateStatus, 2000);
-    setInterval(updateChart, 2000);
-    setInterval(updateAlarmTable, 5000);
-
-    updateStatus();
-    updateChart();
-    updateAlarmTable();
+    setInterval(updateDashboard, 3000);
+    updateDashboard();
 </script>
 </body>
 </html>

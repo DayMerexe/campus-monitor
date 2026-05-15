@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+html { background: #1e1e2e; }
+body {
+  width: 720pt; height: 405pt; margin: 0; padding: 0;
+  background: #1e1e2e; font-family: Arial, sans-serif;
+  display: flex; flex-direction: column;
+}
+.header-bar { background: #1a56db; padding: 18pt 40pt; margin: 0; }
+.header-bar h2 { color: #FFFFFF; font-size: 26pt; margin: 0; }
+.content { margin: 22pt 45pt; display: flex; gap: 28pt; }
+.col { flex: 1; }
+.col-title { margin: 0 0 10pt 0;
+  border-bottom: 2pt solid #1a56db; padding-bottom: 6pt; }
+.col-title p { color: #64a8ff; font-size: 15pt; font-weight: bold; margin: 0; }
+.item { color: #E0E6ED; font-size: 11pt; margin: 0 0 6pt 0; }
+</style>
+</head>
+<body>
+<div class="header-bar"><h2>项目背景与研究意义</h2></div>
+<div class="content">
+  <div class="col">
+    <div class="col-title"><p>校 园 安 全 痛 点</p></div>
+    <p class="item">高校人员密集场所缺乏实时人流监测手段</p>
+    <p class="item">传统人工计数效率低、误差大</p>
+    <p class="item">突发事件时无法快速判断疏散需求</p>
+  </div>
+  <div class="col">
+    <div class="col-title"><p>研 究 目 标</p></div>
+    <p class="item">基于 AI 视觉识别技术，实现校园重点区域人流量实时监测与自动报警</p>
+    <p class="item">检测结果通过 Web 仪表盘可视化展示</p>
+    <p class="item">超过阈值时自动驱动硬件报警（LED + 蜂鸣器）</p>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,22 @@
+# 二进制/大文件
+*.jpg
+*.png
+*.pptx
+*.zip
+*.bin
+*.hex
+*.axf
+
+# 不需要扫描的目录
+Arduino_camera/
+output/
+ppt-slides/
+docs/
+stm32_breath_led/
+stm32_firmware/
+esp8266_bridge/
+likai/
+
+# 大文件
+stm32_serial_led.zip
+中期答辩.pptx

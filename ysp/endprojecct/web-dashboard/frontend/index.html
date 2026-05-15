@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DHT11 温湿度监控面板</title>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+:root {
+  --bg: #0f1923;
+  --card: #1a2736;
+  --border: #2a3a4a;
+  --text: #e0e6ed;
+  --sub: #8899aa;
+  --accent: #00d4aa;
+  --warn: #ff6b6b;
+  --temp: #ff9f43;
+  --humi: #54a0ff;
+  --danger: #ff4757;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+.container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+header {
+  text-align: center; padding: 20px 0;
+  border-bottom: 1px solid var(--border); margin-bottom: 24px;
+}
+header h1 { font-size: 26px; font-weight: 600; letter-spacing: 2px; }
+header .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-left: 10px; }
+.status-dot.online { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+.status-dot.offline { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+
+/* 实时面板 */
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  padding: 24px; text-align: center; transition: transform 0.2s;
+}
+.card:hover { transform: translateY(-2px); }
+.card .label { font-size: 13px; color: var(--sub); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+.card .value { font-size: 48px; font-weight: 700; }
+.card .unit { font-size: 18px; color: var(--sub); margin-left: 4px; }
+.card.temperature .value { color: var(--temp); }
+.card.humidity .value { color: var(--humi); }
+.card.status .value { font-size: 18px; }
+.card.status .value.online-text { color: var(--accent); }
+.card.status .value.offline-text { color: var(--danger); }
+
+/* 图表区 */
+.chart-section {
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  padding: 24px; margin-bottom: 24px;
+}
+.chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 12px; }
+.chart-header h2 { font-size: 16px; font-weight: 500; }
+.time-buttons { display: flex; gap: 6px; }
+.time-buttons button {
+  background: transparent; color: var(--sub); border: 1px solid var(--border);
+  padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all 0.2s;
+}
+.time-buttons button:hover, .time-buttons button.active {
+  background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600;
+}
+#chart { width: 100%; height: 360px; }
+
+/* 告警区 */
+.alert-section {
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  padding: 24px; margin-bottom: 24px;
+}
+.alert-section h2 { font-size: 16px; font-weight: 500; margin-bottom: 16px; }
+.alert-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+.alert-item { background: var(--bg); border-radius: 8px; padding: 16px; }
+.alert-item h3 { font-size: 14px; margin-bottom: 12px; }
+.alert-item label { font-size: 12px; color: var(--sub); display: block; margin-bottom: 4px; }
+.alert-item input[type="range"] { width: 100%; margin-bottom: 8px; accent-color: var(--accent); }
+.alert-item .range-values { display: flex; justify-content: space-between; font-size: 12px; color: var(--sub); margin-bottom: 12px; }
+.alert-item .toggle-row { display: flex; justify-content: space-between; align-items: center; }
+.toggle {
+  position: relative; width: 46px; height: 24px;
+}
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle .slider {
+  position: absolute; inset: 0; background: var(--border); border-radius: 12px;
+  cursor: pointer; transition: 0.2s;
+}
+.toggle .slider::before {
+  content: ''; position: absolute; top: 3px; left: 3px;
+  width: 18px; height: 18px; background: #fff; border-radius: 50%; transition: 0.2s;
+}
+.toggle input:checked + .slider { background: var(--accent); }
+.toggle input:checked + .slider::before { transform: translateX(22px); }
+
+.btn-save {
+  background: var(--accent); color: #000; border: none; padding: 8px 20px;
+  border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
+  margin-top: 12px; transition: opacity 0.2s;
+}
+.btn-save:hover { opacity: 0.85; }
+
+/* 闪烁告警 */
+@keyframes flash-red {
+  0%, 100% { box-shadow: 0 0 0 rgba(255,71,87,0); }
+  50% { box-shadow: 0 0 30px rgba(255,71,87,0.6); }
+}
+.alert-flash { animation: flash-red 1s infinite; border-color: var(--danger) !important; }
+
+/* 告警日志 */
+.log-section { margin-top: 16px; max-height: 200px; overflow-y: auto; }
+.log-section .log-item { font-size: 12px; padding: 6px 0; border-bottom: 1px solid var(--border); color: var(--sub); }
+.log-section .log-item .time { color: var(--text); margin-right: 8px; }
+
+/* 响应式 */
+@media (max-width: 600px) {
+  .card .value { font-size: 36px; }
+  .chart-header { flex-direction: column; align-items: flex-start; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- Header -->
+<header>
+  <h1>DHT11 温湿度监控面板<span class="status-dot offline" id="statusDot"></span></h1>
+  <span id="statusText" style="font-size:13px;color:var(--sub)">MQTT 未连接</span>
+</header>
+
+<!-- 实时面板 -->
+<div class="cards">
+  <div class="card temperature" id="tempCard">
+    <div class="label">温度 Temperature</div>
+    <div class="value">--<span class="unit">°C</span></div>
+  </div>
+  <div class="card humidity" id="humiCard">
+    <div class="label">湿度 Humidity</div>
+    <div class="value">--<span class="unit">%</span></div>
+  </div>
+  <div class="card status">
+    <div class="label">更新时间</div>
+    <div class="value" id="updateTime" style="font-size:16px;color:var(--sub)">等待数据...</div>
+  </div>
+</div>
+
+<!-- 图表 -->
+<div class="chart-section">
+  <div class="chart-header">
+    <h2>历史趋势</h2>
+    <div class="time-buttons">
+      <button data-hours="1">1小时</button>
+      <button data-hours="6">6小时</button>
+      <button data-hours="24" class="active">24小时</button>
+      <button data-hours="168">7天</button>
+    </div>
+  </div>
+  <div id="chart"></div>
+</div>
+
+<!-- 告警配置 -->
+<div class="alert-section">
+  <h2>告警阈值设置</h2>
+  <div class="alert-grid">
+    <div class="alert-item">
+      <h3>🌡️ 温度告警 (°C)</h3>
+      <label>下限</label>
+      <input type="range" id="tempMin" min="-20" max="100" value="0" step="1">
+      <div class="range-values"><span id="tempMinVal">0°C</span><span id="tempMaxVal">40°C</span></div>
+      <label>上限</label>
+      <input type="range" id="tempMax" min="-20" max="100" value="40" step="1">
+      <div class="toggle-row">
+        <span style="font-size:12px;color:var(--sub)">启用</span>
+        <label class="toggle"><input type="checkbox" id="tempEnabled" checked><span class="slider"></span></label>
+      </div>
+      <button class="btn-save" onclick="saveAlerts()">保存设置</button>
+    </div>
+    <div class="alert-item">
+      <h3>💧 湿度告警 (%)</h3>
+      <label>下限</label>
+      <input type="range" id="humiMin" min="0" max="100" value="20" step="1">
+      <div class="range-values"><span id="humiMinVal">20%</span><span id="humiMaxVal">80%</span></div>
+      <label>上限</label>
+      <input type="range" id="humiMax" min="0" max="100" value="80" step="1">
+      <div class="toggle-row">
+        <span style="font-size:12px;color:var(--sub)">启用</span>
+        <label class="toggle"><input type="checkbox" id="humiEnabled" checked><span class="slider"></span></label>
+      </div>
+      <button class="btn-save" onclick="saveAlerts()">保存设置</button>
+    </div>
+  </div>
+  <div class="log-section" id="alertLogs"></div>
+</div>
+
+</div>
+
+<script>
+// ── MQTT 直连 ──────────────────────────────
+const MQTT_BROKER = 'ws://broker.emqx.io:8083/mqtt';
+const MQTT_TOPIC = 'rtt123321123';
+const MQTT_USER = 'rt-thread';
+const MQTT_PASS = 'rt-thread';
+
+const statusDot = document.getElementById('statusDot');
+const statusText = document.getElementById('statusText');
+const updateTime = document.getElementById('updateTime');
+
+let latestTemp = null, latestHumi = null;
+
+const client = mqtt.connect(MQTT_BROKER, {
+  username: MQTT_USER,
+  password: MQTT_PASS,
+  clientId: 'web-dashboard-' + Math.random().toString(16).slice(2, 8),
+  keepalive: 60,
+});
+
+client.on('connect', () => {
+  statusDot.className = 'status-dot online';
+  statusText.textContent = 'MQTT 已连接';
+  statusText.style.color = 'var(--accent)';
+  client.subscribe(MQTT_TOPIC, (err) => {
+    if (!err) console.log('Subscribed to', MQTT_TOPIC);
+  });
+});
+
+client.on('message', (topic, payload) => {
+  try {
+    const data = JSON.parse(payload.toString());
+    const temp = parseFloat(data.temperature);
+    const humi = parseFloat(data.humidity);
+    if (isNaN(temp) || isNaN(humi)) return;
+
+    latestTemp = temp;
+    latestHumi = humi;
+
+    // 更新面板
+    document.querySelector('#tempCard .value').innerHTML = temp + '<span class="unit">°C</span>';
+    document.querySelector('#humiCard .value').innerHTML = humi + '<span class="unit">%</span>';
+
+    const now = new Date();
+    updateTime.textContent = now.toLocaleTimeString('zh-CN');
+    updateTime.style.color = 'var(--text)';
+
+    // 检查告警（前端层面快速检查，配合后端）
+    checkLocalAlerts(temp, humi);
+
+  } catch (e) {
+    console.error('MQTT parse error:', e);
+  }
+});
+
+client.on('error', (err) => {
+  console.error('MQTT error:', err);
+  statusDot.className = 'status-dot offline';
+  statusText.textContent = 'MQTT 连接失败';
+  statusText.style.color = 'var(--danger)';
+});
+
+client.on('close', () => {
+  statusDot.className = 'status-dot offline';
+  statusText.textContent = 'MQTT 已断开';
+  statusText.style.color = 'var(--danger)';
+});
+
+// ── ECharts 图表 ────────────────────────────
+const chartDom = document.getElementById('chart');
+const myChart = echarts.init(chartDom, 'dark');
+let currentHours = 24;
+
+function buildOption(historyData) {
+  const times = historyData.map(d => d.time);
+  const temps = historyData.map(d => d.temperature);
+  const humis = historyData.map(d => d.humidity);
+
+  return {
+    tooltip: {
+      trigger: 'axis',
+      formatter: function(params) {
+        return params.map(p =>
+          p.seriesName + ': ' + p.value + (p.seriesIndex === 0 ? '°C' : '%')
+        ).join('<br/>');
+      }
+    },
+    legend: { data: ['温度', '湿度'], textStyle: { color: '#8899aa' }, top: 0 },
+    grid: { left: 50, right: 50, top: 30, bottom: 30 },
+    xAxis: { type: 'category', data: times, axisLabel: { color: '#8899aa', fontSize: 11, formatter: v => v.slice(5) }, axisLine: { lineStyle: { color: '#2a3a4a' } } },
+    yAxis: [
+      { type: 'value', name: '°C', nameTextStyle: { color: '#ff9f43' }, axisLabel: { color: '#ff9f43' }, splitLine: { lineStyle: { color: '#1a2736' } } },
+      { type: 'value', name: '%', nameTextStyle: { color: '#54a0ff' }, axisLabel: { color: '#54a0ff' }, splitLine: { show: false } }
+    ],
+    series: [
+      { name: '温度', type: 'line', data: temps, yAxisIndex: 0, smooth: true, symbol: 'none',
+        lineStyle: { color: '#ff9f43', width: 2 },
+        itemStyle: { color: '#ff9f43' } },
+      { name: '湿度', type: 'line', data: humis, yAxisIndex: 1, smooth: true, symbol: 'none',
+        lineStyle: { color: '#54a0ff', width: 2 },
+        itemStyle: { color: '#54a0ff' } }
+    ]
+  };
+}
+
+async function loadHistory(hours) {
+  try {
+    const resp = await fetch('/api/data/history?hours=' + hours);
+    const data = await resp.json();
+    if (data.length > 0) {
+      myChart.setOption(buildOption(data), true);
+    } else {
+      myChart.setOption({
+        title: { text: '暂无历史数据', left: 'center', top: 'center', textStyle: { color: '#8899aa', fontSize: 14 } }
+      }, true);
+    }
+  } catch (e) {
+    console.error('Load history error:', e);
+  }
+}
+
+// 时间按钮切换
+document.querySelectorAll('.time-buttons button').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.time-buttons button').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    currentHours = parseInt(this.dataset.hours);
+    loadHistory(currentHours);
+  });
+});
+
+// 初始加载
+loadHistory(24);
+// 每 30 秒刷新图表
+setInterval(() => loadHistory(currentHours), 30000);
+
+// ── 告警配置 ────────────────────────────────
+const tempCard = document.getElementById('tempCard');
+const humiCard = document.getElementById('humiCard');
+let alertConfig = [];
+
+async function loadAlertConfig() {
+  try {
+    const resp = await fetch('/api/alerts/config');
+    alertConfig = await resp.json();
+    alertConfig.forEach(cfg => {
+      if (cfg.metric === 'temperature') {
+        document.getElementById('tempMin').value = cfg.min_val;
+        document.getElementById('tempMax').value = cfg.max_val;
+        document.getElementById('tempEnabled').checked = cfg.enabled === 1;
+        document.getElementById('tempMinVal').textContent = cfg.min_val + '°C';
+        document.getElementById('tempMaxVal').textContent = cfg.max_val + '°C';
+      } else if (cfg.metric === 'humidity') {
+        document.getElementById('humiMin').value = cfg.min_val;
+        document.getElementById('humiMax').value = cfg.max_val;
+        document.getElementById('humiEnabled').checked = cfg.enabled === 1;
+        document.getElementById('humiMinVal').textContent = cfg.min_val + '%';
+        document.getElementById('humiMaxVal').textContent = cfg.max_val + '%';
+      }
+    });
+  } catch (e) { console.error('Load alert config error:', e); }
+}
+
+// 滑块联动显示
+['tempMin', 'tempMax'].forEach(id => {
+  document.getElementById(id).addEventListener('input', function() {
+    const suffix = id.includes('temp') ? '°C' : '%';
+    document.getElementById(id + 'Val').textContent = this.value + suffix;
+  });
+});
+['humiMin', 'humiMax'].forEach(id => {
+  document.getElementById(id).addEventListener('input', function() {
+    document.getElementById(id + 'Val').textContent = this.value + '%';
+  });
+});
+
+async function saveAlerts() {
+  const configs = [
+    { metric: 'temperature', min_val: +document.getElementById('tempMin').value, max_val: +document.getElementById('tempMax').value, enabled: document.getElementById('tempEnabled').checked ? 1 : 0 },
+    { metric: 'humidity', min_val: +document.getElementById('humiMin').value, max_val: +document.getElementById('humiMax').value, enabled: document.getElementById('humiEnabled').checked ? 1 : 0 },
+  ];
+  for (const cfg of configs) {
+    await fetch('/api/alerts/config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cfg)
+    });
+  }
+  // 简单的保存反馈
+  const btns = document.querySelectorAll('.btn-save');
+  btns.forEach(b => { b.textContent = '已保存 ✓'; setTimeout(() => b.textContent = '保存设置', 1500); });
+  await loadAlertConfig();
+}
+
+function checkLocalAlerts(temp, humi) {
+  let flash = false;
+  for (const cfg of alertConfig) {
+    if (!cfg.enabled) continue;
+    const val = cfg.metric === 'temperature' ? temp : humi;
+    const card = cfg.metric === 'temperature' ? tempCard : humiCard;
+    if (val < cfg.min_val || val > cfg.max_val) {
+      card.classList.add('alert-flash');
+      flash = true;
+    } else {
+      card.classList.remove('alert-flash');
+    }
+  }
+  if (!flash) {
+    tempCard.classList.remove('alert-flash');
+    humiCard.classList.remove('alert-flash');
+  }
+}
+
+async function loadAlertLogs() {
+  try {
+    const resp = await fetch('/api/alerts/log?limit=20');
+    const logs = await resp.json();
+    const container = document.getElementById('alertLogs');
+    if (logs.length === 0) {
+      container.innerHTML = '<div style="font-size:12px;color:var(--sub);padding:8px 0">暂无告警记录</div>';
+      return;
+    }
+    container.innerHTML = '<h3 style="font-size:14px;margin-bottom:8px;">告警日志</h3>' +
+      logs.map(l =>
+        '<div class="log-item"><span class="time">' + l.created_at + '</span>' + l.message + '</div>'
+      ).join('');
+  } catch (e) { console.error('Load alert logs error:', e); }
+}
+
+// 初始化告警
+loadAlertConfig().then(() => loadAlertLogs());
+setInterval(() => loadAlertLogs(), 60000);
+
+// 窗口大小变化时重绘图表
+window.addEventListener('resize', () => myChart.resize());
+</script>
+</body>
+</html>

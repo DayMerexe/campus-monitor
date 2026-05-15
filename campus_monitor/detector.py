@@ -7,13 +7,14 @@ import requests
 import threading
 import time
 import torch
+from datetime import datetime
 from ultralytics import YOLO
 
 from db import init_db, insert_detection, start_alarm, end_alarm
 from tcp_server import broadcast, tcp_broadcast
 
 # 配置
-ESP32_CAM_URL = "http://192.168.4.183:81/stream"
+ESP32_CAM_URL = "http://192.168.139.183:81/stream"
 CONFIDENCE_THRESHOLD = 0.5
 PERSON_CLASS_ID = 0
 
@@ -57,6 +58,8 @@ def detect_loop():
     fps_timer = time.time()
     last_db_write = time.time()
     last_tcp_send = 0.0
+    last_sent_count = -1       # 上次发送的 count，变化时才发
+    last_sent_alarm = -1       # 上次发送的 alarm_level
 
     # 报警防抖参数
     ALARM_CONFIRM = 3       # 连续确认帧数
@@ -81,11 +84,13 @@ def detect_loop():
 
         buf = b''
         try:
-            for chunk in r.iter_content(chunk_size=1024):
+            for chunk in r.iter_content(chunk_size=8192):  # 8KB 块减少 Python 循环次数
                 buf += chunk
-                a = buf.find(b'\xff\xd8')   # JPEG SOI
-                b = buf.find(b'\xff\xd9')   # JPEG EOI
-                if a == -1 or b == -1:
+                a = buf.find(b'\xff\xd8')        # JPEG SOI
+                if a == -1:
+                    continue
+                b = buf.find(b'\xff\xd9', a)     # EOI 从 SOI 之后搜索，跳过无效扫描
+                if b == -1:
                     continue
 
                 jpg = buf[a:b + 2]
@@ -131,7 +136,10 @@ def detect_loop():
 
                         if target > 0 and old_level == 0:
                             # 从正常进入报警
-                            alarm_event_id = start_alarm(count, target)
+                            try:
+                                alarm_event_id = start_alarm(count, target)
+                            except Exception as e:
+                                print(f"⚠️ DB 写入失败: {e}")
                             alarm_max_count = count
                             print(f"🚨 黄色预警触发！人数: {count}")
                         elif target == 2 and old_level == 1:
@@ -140,7 +148,10 @@ def detect_loop():
                             print(f"🔴 红色报警！人数: {count}")
                         elif target == 0 and old_level > 0:
                             # 报警解除
-                            end_alarm(alarm_event_id, alarm_max_count)
+                            try:
+                                end_alarm(alarm_event_id, alarm_max_count)
+                            except Exception as e:
+                                print(f"⚠️ DB 写入失败: {e}")
                             print(f"✅ 报警解除。峰值: {alarm_max_count}")
                             alarm_event_id = None
                             alarm_max_count = 0
@@ -170,13 +181,13 @@ def detect_loop():
                 with frame_lock:
                     annotated_frame = annotated
 
-                # 广播给 STM32（最多 2 次/秒）
+                # 广播给 STM32 —— 仅在 count 或 alarm 变化时发送，减少 MQTT 消息量
                 # 手动报警期间，自动广播也发 ALARM:2，防止竞态条件导致 ALARM:0 覆盖手动报警
-                now2 = time.time()
-                if now2 - last_tcp_send >= 0.5:
-                    send_level = 2 if manual_alarm_active else alarm_level
+                send_level = 2 if manual_alarm_active else alarm_level
+                if count != last_sent_count or send_level != last_sent_alarm:
                     broadcast(f"COUNT:{count},ALARM:{send_level}\n")
-                    last_tcp_send = now2
+                    last_sent_count = count
+                    last_sent_alarm = send_level
 
                 # 约每 2 秒写一条 DB 记录
                 now = time.time()
@@ -202,17 +213,43 @@ def detect_loop():
         time.sleep(2)
 
 
-def generate_frames():
-    """视频流生成器 —— 直接用 detect_loop 画好的帧"""
+def generate_frames(stop_event=None):
+    """视频流生成器 —— ~20fps 上限（50ms 间隔），匹配优化后的 ESP32 帧率
+    保持数据流不断，浏览器就不会超时重连导致连接堆积
+    stop_event: threading.Event，新连接替换旧连接时设置，生成器收到后退出"""
+    interval = 0.05  # ~20 FPS 上限（原 0.2=5fps），ESP32 固件优化后可稳定 12-15fps
+    last_send = 0.0
     while True:
-        with frame_lock:
-            if annotated_frame is None:
-                time.sleep(0.05)
-                continue
-            frame = annotated_frame.copy()
+        if stop_event is not None and stop_event.is_set():
+            break
+        # 等待到下一次发送时间
+        now = time.time()
+        wait = interval - (now - last_send)
+        if wait > 0:
+            time.sleep(wait)
 
-        ret, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        with frame_lock:
+            has_frame = annotated_frame is not None
+            if has_frame:
+                frame = annotated_frame.copy()
+                last_send = time.time()
+
+        if has_frame:
+            # 叠加时间戳，帧帧不同防止浏览器判为卡死
+            ts = datetime.now().strftime('%H:%M:%S')
+            cv2.putText(frame, ts, (frame.shape[1] - 100, 20),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            ret, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        else:
+            placeholder = 255 * np.ones((240, 320, 3), dtype=np.uint8)
+            cv2.putText(placeholder, "Waiting...", (80, 130),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
+            ts = datetime.now().strftime('%H:%M:%S')
+            cv2.putText(placeholder, ts, (200, 160),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+            ret, jpeg = cv2.imencode('.jpg', placeholder, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            last_send = time.time()
+
         if ret:
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
-        time.sleep(0.03)

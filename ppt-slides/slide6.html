@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+html { background: #1e1e2e; }
+body {
+  width: 720pt; height: 405pt; margin: 0; padding: 0;
+  background: #1e1e2e; font-family: Arial, sans-serif;
+  display: flex; flex-direction: column;
+}
+.header-bar { background: #1a56db; padding: 18pt 40pt; margin: 0; }
+.header-bar h2 { color: #FFFFFF; font-size: 26pt; margin: 0; }
+.content { margin: 14pt 40pt; display: flex; gap: 20pt; }
+.col { flex: 1; }
+.module-card {
+  background: #2a2a3e; padding: 8pt 12pt; border-radius: 4pt;
+  margin-bottom: 8pt; border-left: 3pt solid #1a56db;
+}
+.module-card h4 { color: #64a8ff; font-size: 11pt; margin: 0 0 3pt 0; }
+.module-card p { color: #CCC; font-size: 9pt; margin: 0; }
+.section-title { margin: 0 0 8pt 0;
+  border-bottom: 2pt solid #1a56db; padding-bottom: 4pt; }
+.section-title p { color: #64a8ff; font-size: 13pt; font-weight: bold; margin: 0; }
+</style>
+</head>
+<body>
+<div class="header-bar"><h2>软件设计与实现</h2></div>
+<div class="content">
+  <div class="col">
+    <div class="section-title"><p>Python 后端模块</p></div>
+    <div class="module-card"><h4>app.py</h4><p>Flask 入口, 6 REST API 路由</p></div>
+    <div class="module-card"><h4>detector.py</h4><p>MJPEG+YOLOv8+TCP+DB</p></div>
+    <div class="module-card"><h4>db.py</h4><p>SQLite: 检测+报警两张表</p></div>
+    <div class="module-card"><h4>tcp_server.py</h4><p>TCP 8888 客户端管理</p></div>
+  </div>
+  <div class="col">
+    <div class="section-title"><p>Web 前端</p></div>
+    <div class="module-card" style="margin-bottom:8pt;">
+      <p>Chart.js 实时折线图</p>
+      <p>毛玻璃仪表盘, 2s刷新</p>
+      <p>动态阈值 + 手动报警</p>
+    </div>
+    <div class="section-title"><p>STM32 固件</p></div>
+    <div class="module-card">
+      <p>AT init  TCP 透传</p>
+      <p>sscanf GPIOPinCtrl</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

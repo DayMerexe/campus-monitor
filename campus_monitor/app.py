@@ -12,6 +12,10 @@ import tcp_server  # 用于访问 tcp_server.stm32_connected
 
 app = Flask(__name__)
 
+# /video_feed 单连接控制：新连接来踢旧连接，防止浏览器重连导致连接池耗尽
+_feed_lock = threading.Lock()
+_active_feed_stop = None  # 当前活跃连接的停止信号
+
 
 @app.route('/')
 def index():
@@ -20,7 +24,13 @@ def index():
 
 @app.route('/video_feed')
 def video_feed():
-    return Response(detector.generate_frames(),
+    global _active_feed_stop
+    stop_event = threading.Event()
+    with _feed_lock:
+        if _active_feed_stop is not None:
+            _active_feed_stop.set()  # 踢掉旧连接
+        _active_feed_stop = stop_event
+    return Response(detector.generate_frames(stop_event=stop_event),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
@@ -84,6 +94,31 @@ def alarms():
     """返回报警事件列表"""
     rows = get_alarm_events(50)
     return jsonify(rows)
+
+
+@app.route('/dashboard')
+def dashboard():
+    """合并接口：一次返回 status + history + alarms，减少前端轮询连接"""
+    stats = get_today_stats()
+    history_rows = get_recent_records(20)
+    alarm_rows = get_alarm_events(50)
+    return jsonify({
+        'status': {
+            'count': detector.person_count,
+            'alarm': detector.alarm_active,
+            'alarm_level': detector.alarm_level,
+            'threshold': detector.ALARM_THRESHOLD_RED,
+            'threshold_warn': detector.ALARM_THRESHOLD_WARN,
+            'fps': round(detector.current_fps, 1),
+            'today_detections': stats['total_detections'],
+            'today_alarms': stats['alarm_count'],
+            'peak_count': stats['peak_count'],
+            'stm32_online': tcp_server.stm32_connected,
+            'flame_active': tcp_server.flame_active
+        },
+        'history': history_rows,
+        'alarms': alarm_rows
+    })
 
 
 if __name__ == '__main__':

@@ -1,5 +1,6 @@
 #include "esp_camera.h"
 #include <WiFi.h>
+#include "esp_wifi.h"
 
 //
 // WARNING!!! PSRAM IC required for UXGA resolution and high JPEG quality
@@ -7,7 +8,7 @@
 //            Partial images will be transmitted if image exceeds buffer size
 //
 //            You must select partition scheme from the board menu that has at least 3MB APP space.
-//            Face Recognition is DISABLED for ESP32 and ESP32-S2, because it takes up from 15 
+//            Face Recognition is DISABLED for ESP32 and ESP32-S2, because it takes up from 15
 //            seconds to process single frame. Face Detection is ENABLED if PSRAM is enabled as well
 
 // ===================
@@ -43,8 +44,7 @@ void setupLedFlash(int pin);
 
 void setup() {
   Serial.begin(115200);
-  Serial.setDebugOutput(true);
-  Serial.println();
+  // Serial.setDebugOutput(true);  // 关闭调试输出以节省 CPU 周期
 
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
@@ -69,18 +69,16 @@ void setup() {
   config.frame_size = FRAMESIZE_VGA;      // 640×480
   config.pixel_format = PIXFORMAT_JPEG; // for streaming
   //config.pixel_format = PIXFORMAT_RGB565; // for face detection/recognition
-  config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
+  config.grab_mode = CAMERA_GRAB_LATEST;   // 流式传输：始终取最新帧
   config.fb_location = CAMERA_FB_IN_PSRAM;
-  config.jpeg_quality = 12;
+  config.jpeg_quality = 8;                // 更小文件，更快 WiFi 传输（原 10）
   config.fb_count = 1;
-  
-  // if PSRAM IC present, init with UXGA resolution and higher JPEG quality
-  //                      for larger pre-allocated frame buffer.
+
+  // if PSRAM IC present, double buffer for smoother streaming
   if(config.pixel_format == PIXFORMAT_JPEG){
     if(psramFound()){
-      config.jpeg_quality = 18;
+      config.jpeg_quality = 8;
       config.fb_count = 2;
-      config.grab_mode = CAMERA_GRAB_LATEST;
     } else {
       // Limit the frame size when PSRAM is not available
       config.frame_size = FRAMESIZE_SVGA;
@@ -118,8 +116,8 @@ void setup() {
     s->set_framesize(s, FRAMESIZE_VGA);
   }
 
-  /* 自定义画质参数 */
-  s->set_quality(s, 20);             // 画质 0-63，越小画质越好（20=清晰）
+  /* 帧率优化：低画质 + 稳定参数 */
+  s->set_quality(s, 8);              // 0-63，8=最小安全值，每帧约8KB（原12）
   s->set_brightness(s, -1);
   s->set_contrast(s, -1);
   s->set_saturation(s, -1);
@@ -140,7 +138,7 @@ void setup() {
 #endif
 
   WiFi.begin(ssid, password);
-  WiFi.setSleep(false);
+  WiFi.setSleep(false);                // Arduino 层关闭 modem sleep
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -148,6 +146,8 @@ void setup() {
   }
   Serial.println("");
   Serial.println("WiFi connected");
+
+  esp_wifi_set_ps(WIFI_PS_NONE);       // ESP-IDF 层彻底关闭所有 WiFi 省电模式
 
   startCameraServer();
 
