@@ -5,8 +5,8 @@
 
 ## 当前状态
 _更新于 2026-05-15_
-- [硬件]: ESP32-CAM 固件帧率优化（WiFi PS + quality 8 + Nagle关闭）(commit `0cc438d`)
-- [后端]: /video_feed连接去重 + stop_event退出 + ESP8266无限重连+指数退避
+- [硬件]: 固件 v5 合并（30MHz XCLK + QVGA 320×240），OV2640 未损坏，原始流实测 20+fps
+- [后端]: /video_feed连接去重 + stop_event + ESP8266无限重连，mDNS 待补
 - [前端]: 轮询合并为 /dashboard，连接数减半
 
 ## 运行命令
@@ -30,13 +30,12 @@ _更新于 2026-05-15_
 - [ ] 烧录新 ESP32-CAM 固件（需实物操作）
 - [ ] 火焰传感器+舵机实物联调
 - [ ] 多场景模拟（MP4 替代摄像头）
+- [ ] 手机推送通知
 - [ ] 论文第3章（系统设计与实现）
 - [ ] 论文第4章（系统测试与分析）
-- 数据传输修复 → 子对话处理，见 `docs/传输修复指南.md`
-- 帧率优化 → 子对话处理，见 `docs/ESP32-CAM帧率问题.md`
 
 ## 已知问题
-（暂无）
+- mDNS 未实现（detector.py + ESP32 固件），IP 变化时需手动改代码
 
 ## 技术栈
 Python: Flask, PyTorch, YOLOv8, OpenCV, paho-mqtt | Arduino: ESP8266WiFi, PubSubClient | STM32: HAL UART/GPIO, TIM3 PWM | 前端: Chart.js, 原生 JS

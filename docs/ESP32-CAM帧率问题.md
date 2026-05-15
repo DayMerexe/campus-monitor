@@ -11,7 +11,7 @@
 
 | 环节 | 当前状态 | 瓶颈程度 |
 |------|---------|---------|
-| ESP32 OV2640 采集+编码 | VGA 640×480, quality=20, 约 25fps 理论值 | 低 |
+| ESP32 OV2640 采集+编码 | QVGA 320×240, XCLK 30MHz, quality=8, 实测 20+fps | 低 |
 | ESP32 JPEG 文件大小 | quality=20 → 每帧 ~25KB | 中 |
 | WiFi 传输 | 802.11n, 实测 ~1MB/s | 中 |
 | Python `requests` 读 MJPEG 流 | `iter_content(chunk_size=1024)`, 逐帧解析 | 低 |
@@ -19,9 +19,7 @@
 | `generate_frames()` | 硬限制 200ms → 5fps | 中（有意为之） |
 | 浏览器渲染 | `<img>` 标签 MJPEG | 低 |
 
-**结论：ESP32 固件不是主瓶颈，YOLO 推理才是。但固件有优化空间。**
-
-**[新发现 2026-05-15]** 直接访问 ESP32 `/stream` 原始流也只有 ~5fps，排除 Python/YOLO 干扰后瓶颈确实在固件端。（固件优化已于 #4 合并。）
+**结论（终）**：瓶颈在 OV2640 的 PLL 在 20MHz XCLK 下无法正确锁频，30MHz+QVGA 解决。YOLO GPU 推理 10ms 非瓶颈。ESP32 原始流从 ~5fps → 20+fps。
 
 ---
 
@@ -85,6 +83,16 @@ from detector import model, detect_loop
 
 ---
 
+## 诊断结论（交叉测试确认）
+
+**最终结论**：
+- 20MHz XCLK 在 ESP32 + OV2640 上无论配什么分辨率都 ~5fps，30MHz 配 VGA 也无画面
+- **唯一可行组合：30MHz XCLK + QVGA (320×240) = 20+ fps**
+- OV2640 模组未损坏，20MHz 低帧率是 OV2640 PLL 在 20MHz 下无法正确锁频（30MHz 正常）
+- 分辨率从 VGA 降到 QVGA：YOLO 推理尺寸不变（本就 320×240），浏览器画面变小但够用
+
+---
+
 ## 已知但未修复的问题
 
 ### 1. HTTP 连接泄漏（视频流失联）
@@ -139,6 +147,13 @@ _子对话在此更新，一项完成追加一行_
 | 2026-05-15 | **[新发现]** 直接访问 ESP32 `/stream` 仅 ~5fps，瓶颈在固件非 YOLO；定位 WiFi PS 缺失 + Nagle 延迟 + 人脸检测编译 | 入口文档分析 |
 | 2026-05-15 | 固件轮交付 3 个 `_fixed`：WiFi PS + 质量调优、app_httpd 流处理器大改、Python 采集+输出帧率 | `CameraWebServer_fixed.ino`、`app_httpd_fixed.cpp`、`detector_fixed.py` |
 | 2026-05-15 | YOLO 轮：GPU 推理实测 10ms 确认非瓶颈；CUDA warmup + 显式设备选择防止首帧卡顿 | `detector_fixed.py` (YOLO优化轮) |
+| 2026-05-15 | **[新发现]** ping ESP32 250ms！30MHz XCLK 曾达 30fps；根因指向 OV2640 PLL 残留 + WiFi 信号差 | 诊断分析 |
+| 2026-05-15 | 固件 v2：PWDN 硬断电 + 传感器软复位 + WiFi N 协议强制 + RSSI 诊断 | `CameraWebServer_fixed_v2.ino` |
+| 2026-05-15 | **[关键线索]** 换用 OV3660 模块（同一 ESP32 主板）视频流畅！确认问题在 OV2640 端，非 WiFi/软件 | 诊断确认 |
+| 2026-05-15 | **[推翻诊断]** 自己 OV2640 + CameraWebServer2 (30MHz+QVGA) = 20+fps！OV2640 未损坏。对比发现 QVGA vs VGA 差异巨大 | 诊断修正 |
+| 2026-05-15 | 固件 v3：仅改 QVGA，保持 20MHz → 仍卡顿+断流，排除分辨率 | 测试否定了分辨率假说 |
+| 2026-05-15 | 固件 v4~v5 交叉测试：30MHz+QVGA+优化代码 = 20+fps ✓；20MHz 任何分辨率都卡；30MHz+VGA 无画面 | 定位 30MHz+QVGA 为唯一可行组合 |
+| 2026-05-15 | **帧率优化完成**：30MHz+QVGA 实测 20+fps，入口文档+CLAUDE.md 已同步 | 任务关闭 |
 
 ---
 
@@ -155,3 +170,5 @@ _主对话合并时对照此表_
 | ~~C~~ | ~~`app_fixed.py`~~ | 移交给数据传输对话（/video_feed 连接去重） | — | ✅ 已合并 |
 | — | mDNS #3a | ESP32 固件 ESPmDNS 广播 | — | 待补 |
 | 4 | `detector_fixed.py` | CUDA warmup + 显式设备选择 | ✓ py_compile | ✅ 已合并 |
+| 5 | `CameraWebServer_fixed_v2.ino` | PWDN 断电 + 传感器复位 + WiFi N 强制 + RSSI 诊断 | ✓ diff | ✅ 已合并 |
+| 6 | `CameraWebServer_fixed_v5.ino` | 最终方案：30MHz XCLK + QVGA 320×240 | ✓ 实测 20+fps | ✅ 已合并 |

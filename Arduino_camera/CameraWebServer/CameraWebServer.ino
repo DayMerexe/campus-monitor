@@ -65,13 +65,13 @@ void setup() {
   config.pin_sccb_scl = SIOC_GPIO_NUM;
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
-  config.xclk_freq_hz = 20000000;
-  config.frame_size = FRAMESIZE_VGA;      // 640×480
+  config.xclk_freq_hz = 30000000;
+  config.frame_size = FRAMESIZE_QVGA;     // 320×240
   config.pixel_format = PIXFORMAT_JPEG; // for streaming
   //config.pixel_format = PIXFORMAT_RGB565; // for face detection/recognition
   config.grab_mode = CAMERA_GRAB_LATEST;   // 流式传输：始终取最新帧
   config.fb_location = CAMERA_FB_IN_PSRAM;
-  config.jpeg_quality = 8;                // 更小文件，更快 WiFi 传输（原 10）
+  config.jpeg_quality = 8;                // 更小文件，更快 WiFi 传输
   config.fb_count = 1;
 
   // if PSRAM IC present, double buffer for smoother streaming
@@ -97,6 +97,14 @@ void setup() {
   pinMode(14, INPUT_PULLUP);
 #endif
 
+  // 传感器硬件复位：PWDN 引脚上下电，清除 OV2640 PLL 残留状态
+  pinMode(PWDN_GPIO_NUM, OUTPUT);
+  digitalWrite(PWDN_GPIO_NUM, HIGH);  // 断电
+  delay(200);
+  digitalWrite(PWDN_GPIO_NUM, LOW);   // 上电
+  delay(200);
+  Serial.println("Sensor power-cycled via PWDN");
+
   // camera init
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
@@ -105,6 +113,8 @@ void setup() {
   }
 
   sensor_t * s = esp_camera_sensor_get();
+  s->reset(s);                        // SCCB 软复位，重置 PLL 到默认值
+  Serial.println("Sensor soft-reset done");
   // initial sensors are flipped vertically and colors are a bit saturated
   if (s->id.PID == OV3660_PID) {
     s->set_vflip(s, 1); // flip it back
@@ -113,11 +123,11 @@ void setup() {
   }
   // drop down frame size for higher initial frame rate
   if(config.pixel_format == PIXFORMAT_JPEG){
-    s->set_framesize(s, FRAMESIZE_VGA);
+    s->set_framesize(s, FRAMESIZE_QVGA);
   }
 
   /* 帧率优化：低画质 + 稳定参数 */
-  s->set_quality(s, 8);              // 0-63，8=最小安全值，每帧约8KB（原12）
+  s->set_quality(s, 8);              // 0-63，8=最小安全值
   s->set_brightness(s, -1);
   s->set_contrast(s, -1);
   s->set_saturation(s, -1);
@@ -148,6 +158,9 @@ void setup() {
   Serial.println("WiFi connected");
 
   esp_wifi_set_ps(WIFI_PS_NONE);       // ESP-IDF 层彻底关闭所有 WiFi 省电模式
+  esp_wifi_set_protocol(WIFI_IF_STA, WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N);
+  esp_wifi_set_bandwidth(WIFI_IF_STA, WIFI_BW_HT20);
+  Serial.printf("WiFi RSSI: %d dBm\n", WiFi.RSSI());
 
   startCameraServer();
 
