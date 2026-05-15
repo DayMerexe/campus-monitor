@@ -1,5 +1,18 @@
 # 进度日志
 
+## 2026-05-15 (#10) [后端] [前端]
+
+**做了什么：** 合并多场景联动改造：detector.py（3路检测+联动引擎+通知集成）、app.py（多路API+火灾模拟）、db.py（channel扩展）、index.html（三窗口仪表盘）、notify.py（手机推送模块）
+
+**关键决策：**
+- detector_notify_fixed.py 的通知调用手工集成进多通道版（原基于单通道代码）
+- import 路径修复：db_fixed→db, detector_fixed→detector, index_fixed.html→index.html
+- 通道 A 保留 ESP32-CAM 实时流 + MP4 回退，B/C 纯 MP4 循环
+
+**涉及文件：** `detector.py`, `app.py`, `db.py`, `templates/index.html`, `notify.py`（新建）
+
+**下一步：** 准备 MP4 测试视频，启动系统验证三通道联动
+
 ## 2026-05-15 (#9) [硬件]
 
 **做了什么：** 合并帧率子对话 v5 固件：30MHz XCLK + QVGA（实测 20+fps），OV2640 未损坏

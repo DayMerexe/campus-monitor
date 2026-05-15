@@ -6,8 +6,9 @@
 ## 当前状态
 _更新于 2026-05-15_
 - [硬件]: 固件 v5 合并（30MHz XCLK + QVGA 320×240），OV2640 未损坏，原始流实测 20+fps
+- [配置]: 后续计划已制定：8 任务 4 阶段（多场景模拟→手机推送→硬件联调→论文答辩）
 - [后端]: /video_feed连接去重 + stop_event + ESP8266无限重连，mDNS 待补
-- [前端]: 轮询合并为 /dashboard，连接数减半
+- [帧率]: ESP32-CAM 帧率问题已解决，根因是 20MHz XCLK 下 OV2640 PLL 无法正确锁频，30MHz+QVGA 是唯一可行组合
 
 ## 运行命令
 `cd F:\bishe\campus_monitor && /c/Users/DayMer/miniconda3/python.exe app.py` → http://localhost:5000
@@ -27,12 +28,10 @@ _更新于 2026-05-15_
 - 三级报警+火焰防抖，详见 docs/architecture.md
 
 ## 待办事项
-- [ ] 烧录新 ESP32-CAM 固件（需实物操作）
-- [ ] 火焰传感器+舵机实物联调
-- [ ] 多场景模拟（MP4 替代摄像头）
-- [ ] 手机推送通知
-- [ ] 论文第3章（系统设计与实现）
-- [ ] 论文第4章（系统测试与分析）
+- [ ] 多场景模拟：detector.py 多路 MP4 → 联动引擎 → 仪表盘三通道 → API/MQTT 扩展
+- [ ] 手机推送通知（PushPlus/Server酱）
+- [ ] 火焰传感器/舵机联调
+- [ ] 论文第3-4章 + 终期答辩PPT
 
 ## 已知问题
 - mDNS 未实现（detector.py + ESP32 固件），IP 变化时需手动改代码
@@ -48,6 +47,7 @@ Python: Flask, PyTorch, YOLOv8, OpenCV, paho-mqtt | Arduino: ESP8266WiFi, PubSub
 | [传输修复指南](docs/传输修复指南.md) | 修复清单 + 合并步骤 |
 | [帧率问题](docs/ESP32-CAM帧率问题.md) | ESP32-CAM 帧率分析+优化（子对话A入口） |
 | [传输问题](docs/数据传输问题总结.md) | HTTP/MQTT/DB 传输汇总（子对话B入口） |
+| [多场景改造](docs/多场景模拟改造.md) | 三通道联动模拟（子对话入口） |
 | [进度日志](docs/PROGRESS.md) | 完整开发进度 |
 | [硬件引脚](docs/hardware.md) | STM32 引脚定义 |
 | [文档写作](docs/writing.md) | 论文格式、PPT 工作流 |

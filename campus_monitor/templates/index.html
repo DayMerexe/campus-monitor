@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>校园人流量监测系统</title>
+    <title>校园人流量监测系统 — 三通道联动</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -32,84 +32,148 @@
             display: flex; justify-content: center;
             padding: 20px 16px;
         }
-        .container {
-            max-width: 1320px; width: 100%;
-        }
+        .container { max-width: 1320px; width: 100%; }
 
-        /* ===== 顶栏 ===== */
+        /* 顶栏 */
         .top-bar {
             display: flex; justify-content: space-between; align-items: flex-end;
-            margin-bottom: 20px; padding-bottom: 14px;
+            margin-bottom: 16px; padding-bottom: 12px;
             border-bottom: 1px solid var(--glass-border);
         }
-        .top-bar h1 {
-            font-size: 22px; font-weight: 600;
-            letter-spacing: -0.3px;
-            color: var(--text-primary);
-        }
+        .top-bar h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.3px; }
         .top-bar h1 span { color: var(--blue); }
-        .top-bar .subtitle {
-            font-size: 12px; color: var(--text-secondary);
-            margin-top: 2px; letter-spacing: 0.5px;
-        }
-        .top-right {
-            display: flex; align-items: center; gap: 14px;
-        }
-        .fps-badge {
-            font-size: 12px; color: var(--text-secondary);
+        .top-bar .subtitle { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+        .top-right { display: flex; align-items: center; gap: 10px; }
+        .badge {
+            font-size: 11px; color: var(--text-secondary);
             font-variant-numeric: tabular-nums;
             background: var(--glass-bg);
             border: 1px solid var(--glass-border);
-            padding: 5px 12px;
-            border-radius: 6px;
+            padding: 4px 10px; border-radius: 6px;
         }
+        .badge.online { color: var(--green); }
+        .badge.fire-badge { color: var(--red); display: none; }
 
-        /* ===== 主区域 ===== */
-        .main-row { display: flex; gap: 16px; }
-
-        /* 左侧列 */
-        .left-col { flex: 0 0 640px; display: flex; flex-direction: column; gap: 14px; }
-        .video-box {
+        /* 三列视频区 */
+        .video-row { display: flex; gap: 12px; margin-bottom: 14px; }
+        .channel-col {
+            flex: 1; min-width: 0;
             background: var(--glass-bg);
             backdrop-filter: blur(16px);
             border: 1px solid var(--glass-border);
             border-radius: var(--radius);
             overflow: hidden;
-            position: relative;
             box-shadow: var(--glass-shadow);
         }
-        .video-box img { width: 100%; display: block; }
-        .video-box .live-tag {
-            position: absolute; top: 12px; left: 12px;
-            display: flex; align-items: center; gap: 5px;
-            background: rgba(0,0,0,0.45);
-            backdrop-filter: blur(8px);
-            padding: 4px 10px; border-radius: 6px;
-            font-size: 11px; font-weight: 600;
-            color: var(--red);
+        .channel-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--glass-border);
+            background: rgba(0,0,0,0.1);
         }
-        .video-box .live-tag::before {
-            content: '';
-            width: 6px; height: 6px;
-            border-radius: 50%;
-            background: var(--red);
-            animation: live-dot 1.5s ease-in-out infinite;
+        .channel-header .ch-name { font-size: 13px; font-weight: 600; }
+        .channel-header .ch-desc { font-size: 10px; color: var(--text-secondary); }
+        .channel-header .ch-status {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 11px; font-weight: 500;
         }
-        @keyframes live-dot {
-            0%, 100% { opacity: 1; box-shadow: 0 0 4px var(--red); }
-            50% { opacity: 0.3; box-shadow: none; }
+        .status-dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: var(--text-dim);
         }
+        .status-dot.green { background: var(--green); box-shadow: 0 0 6px var(--green); }
+        .status-dot.amber { background: var(--amber); box-shadow: 0 0 6px var(--amber); animation: dot-glow 1s ease-in-out infinite; }
+        .status-dot.red { background: var(--red); box-shadow: 0 0 6px var(--red); animation: dot-glow 0.5s ease-in-out infinite; }
+        @keyframes dot-glow {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        .channel-video {
+            position: relative;
+            aspect-ratio: 4/3;
+            background: #000;
+        }
+        .channel-video img { width: 100%; height: 100%; display: block; object-fit: contain; }
+        .channel-video .fire-overlay {
+            display: none;
+            position: absolute; inset: 0;
+            background: rgba(255,30,0,0.12);
+            border: 3px solid rgba(255,60,30,0.6);
+            pointer-events: none;
+            animation: fire-border 0.8s ease-in-out infinite;
+        }
+        .channel-video .fire-overlay.show { display: block; }
+        @keyframes fire-border {
+            0%, 100% { border-color: rgba(255,60,30,0.6); }
+            50% { border-color: rgba(255,120,30,0.2); }
+        }
+        .channel-video .fire-label {
+            display: none;
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 28px; font-weight: 700;
+            color: #ff3a1a;
+            text-shadow: 0 0 20px rgba(255,30,0,0.6);
+            pointer-events: none;
+        }
+        .channel-video .fire-label.show { display: block; }
 
-        /* 控制栏（改放到视频下方） */
+        .channel-stats {
+            display: flex; gap: 6px; padding: 10px 14px;
+        }
+        .ch-stat {
+            flex: 1; text-align: center;
+            padding: 8px 4px;
+            background: rgba(0,0,0,0.12);
+            border-radius: 8px;
+        }
+        .ch-stat .val {
+            font-size: 20px; font-weight: 700;
+            font-variant-numeric: tabular-nums;
+        }
+        .ch-stat .lbl { font-size: 10px; color: var(--text-secondary); margin-top: 2px; }
+        .ch-stat .val.c-green { color: var(--green); }
+        .ch-stat .val.c-amber { color: var(--amber); }
+        .ch-stat .val.c-red { color: var(--red); }
+        .ch-stat .val.c-blue { color: var(--blue); }
+
+        /* 推荐面板 */
+        .recommend-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius);
+            padding: 16px 20px;
+            margin-bottom: 14px;
+            display: flex; align-items: center; gap: 16px;
+            box-shadow: var(--glass-shadow);
+            transition: all 0.3s;
+        }
+        .recommend-panel.safe { border-color: rgba(93,219,143,0.2); }
+        .recommend-panel.danger { border-color: rgba(255,90,90,0.2); background: rgba(255,90,90,0.04); }
+        .recommend-panel.all-danger { border-color: rgba(255,90,90,0.3); background: rgba(255,90,90,0.06); }
+        .rec-icon { font-size: 36px; flex-shrink: 0; }
+        .rec-text { flex: 1; }
+        .rec-text .rec-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+        .rec-text .rec-detail { font-size: 12px; color: var(--text-secondary); }
+        .rec-exit {
+            font-size: 18px; font-weight: 700; color: var(--blue);
+            background: rgba(100,168,255,0.08);
+            padding: 8px 16px; border-radius: 8px;
+            flex-shrink: 0;
+        }
+        .rec-exit.danger-exit { color: var(--red); background: rgba(255,90,90,0.08); }
+
+        /* 控制栏 */
         .control-bar {
             background: var(--glass-bg);
             backdrop-filter: blur(16px);
             border: 1px solid var(--glass-border);
             border-radius: var(--radius);
-            padding: 14px 18px;
+            padding: 12px 16px;
+            margin-bottom: 14px;
             display: flex; align-items: center; gap: 10px;
-            flex-wrap: wrap;
-            font-size: 13px;
+            flex-wrap: wrap; font-size: 13px;
             box-shadow: var(--glass-shadow);
         }
         .control-bar .sep {
@@ -117,186 +181,108 @@
             background: var(--glass-border);
             margin: 0 4px;
         }
-        .control-bar label {
-            color: var(--text-secondary);
-            font-size: 13px;
-        }
+        .control-bar label { color: var(--text-secondary); font-size: 12px; }
         .control-bar input {
-            padding: 7px 10px;
-            border-radius: 6px;
+            padding: 6px 8px; border-radius: 6px;
             border: 1px solid var(--glass-border);
             background: rgba(0,0,0,0.15);
             color: var(--text-primary);
-            font-family: inherit;
-            font-size: 14px;
-            width: 64px;
-            text-align: center;
-            outline: none;
-            transition: border-color 0.2s, box-shadow 0.2s;
+            font-family: inherit; font-size: 14px;
+            width: 56px; text-align: center; outline: none;
         }
         .control-bar input:focus {
             border-color: var(--blue);
             box-shadow: 0 0 0 3px rgba(100,168,255,0.1);
         }
-        .control-bar button {
-            padding: 7px 16px;
-            border-radius: 6px;
+        .btn {
+            padding: 6px 14px; border-radius: 6px;
             border: 1px solid var(--glass-border);
             background: rgba(0,0,0,0.15);
-            font-family: inherit;
-            font-weight: 500;
-            cursor: pointer;
-            font-size: 13px;
+            font-family: inherit; font-weight: 500;
+            cursor: pointer; font-size: 12px;
             transition: all 0.15s;
             color: var(--text-primary);
         }
-        .control-bar button:hover {
-            background: var(--glass-hover);
+        .btn:hover { background: var(--glass-hover); }
+        .btn-set { color: var(--blue); }
+        .btn-fire-on {
+            color: #ff6b3a; border-color: rgba(255,107,58,0.2);
+            background: rgba(255,107,58,0.06);
         }
-        .control-bar .btn-alarm-on {
-            color: var(--red);
-            border-color: rgba(255,90,90,0.2);
-            background: rgba(255,90,90,0.06);
+        .btn-fire-on:hover { background: rgba(255,107,58,0.12); }
+        .btn-fire-on.active {
+            background: rgba(255,60,30,0.15);
+            border-color: rgba(255,60,30,0.4);
+            color: #ff3a1a;
         }
-        .control-bar .btn-alarm-on:hover {
-            background: rgba(255,90,90,0.12);
-        }
-        .control-bar .btn-alarm-off {
+        .btn-fire-off {
             color: var(--green);
             border-color: rgba(93,219,143,0.2);
             background: rgba(93,219,143,0.06);
         }
-        .control-bar .btn-alarm-off:hover {
-            background: rgba(93,219,143,0.12);
+        .btn-alarm-on {
+            color: var(--red);
+            border-color: rgba(255,90,90,0.2);
+            background: rgba(255,90,90,0.06);
+        }
+        .btn-alarm-off {
+            color: var(--green);
+            border-color: rgba(93,219,143,0.2);
+            background: rgba(93,219,143,0.06);
         }
 
-        /* 右侧列 */
-        .right-col { flex: 1; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-
-        /* 统计卡片（竖排，比 2x2 更清晰） */
-        .stats-grid {
-            display: grid; grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
-        .stat-card {
-            background: var(--glass-bg);
-            backdrop-filter: blur(16px);
-            border: 1px solid var(--glass-border);
-            border-radius: var(--radius);
-            padding: 18px 14px;
-            text-align: center;
-            transition: all 0.2s;
-            box-shadow: var(--glass-shadow);
-        }
-        .stat-card:hover {
-            background: var(--glass-hover);
-            transform: translateY(-1px);
-        }
-        .stat-card .label {
-            font-size: 11px; color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 6px;
-        }
-        .stat-card .value {
-            font-size: 30px; font-weight: 700;
-            letter-spacing: -0.5px;
-            font-variant-numeric: tabular-nums;
-        }
-        .stat-card .value.c1 { color: var(--blue); }
-        .stat-card .value.c2 { color: var(--red); }
-        .stat-card .value.c3 { color: var(--amber); }
-        .stat-card .value.c4 { color: var(--green); }
-
-        /* 折线图卡片 */
+        /* 折线图 + 报警历史 */
+        .bottom-row { display: flex; gap: 14px; }
         .chart-box {
+            flex: 1;
             background: var(--glass-bg);
             backdrop-filter: blur(16px);
             border: 1px solid var(--glass-border);
             border-radius: var(--radius);
             padding: 16px 16px 12px;
-            flex: 1; min-height: 240px;
+            min-height: 260px;
             box-shadow: var(--glass-shadow);
         }
         .chart-box canvas { width: 100% !important; height: 100% !important; }
-
-        /* ===== 报警横幅 ===== */
-        .alarm-banner {
-            display: none;
-            text-align: center;
-            padding: 14px;
-            margin-top: 14px;
-            border-radius: var(--radius);
-            font-size: 16px;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-        }
-        .alarm-banner.warn {
-            display: block;
-            background: rgba(245,182,76,0.08);
-            border: 1px solid rgba(245,182,76,0.15);
-            color: var(--amber);
-            animation: warn-glow 1.5s ease-in-out infinite;
-        }
-        .alarm-banner.red {
-            display: block;
-            background: rgba(255,90,90,0.08);
-            border: 1px solid rgba(255,90,90,0.15);
-            color: var(--red);
-            animation: alarm-glow 1.5s ease-in-out infinite;
-        }
-        @keyframes warn-glow {
-            0%, 100% { box-shadow: 0 0 16px rgba(245,182,76,0.04); }
-            50% { box-shadow: 0 0 32px rgba(245,182,76,0.1); }
-        }
-        @keyframes alarm-glow {
-            0%, 100% { box-shadow: 0 0 16px rgba(255,90,90,0.04); }
-            50% { box-shadow: 0 0 32px rgba(255,90,90,0.1); }
-        }
-
-        /* ===== 报警历史 ===== */
         .alarm-section {
+            flex: 0 0 380px;
             background: var(--glass-bg);
             backdrop-filter: blur(16px);
             border: 1px solid var(--glass-border);
             border-radius: var(--radius);
             padding: 16px 20px;
-            margin-top: 12px;
             box-shadow: var(--glass-shadow);
+            max-height: 300px;
+            overflow-y: auto;
         }
         .alarm-section h3 {
-            font-size: 13px; font-weight: 600;
+            font-size: 12px; font-weight: 600;
             color: var(--text-secondary);
-            margin-bottom: 12px;
+            margin-bottom: 10px;
         }
         .alarm-table { width: 100%; border-collapse: collapse; }
         .alarm-table th {
-            text-align: left; padding: 8px 10px;
+            text-align: left; padding: 6px 8px;
             color: var(--text-dim);
             border-bottom: 1px solid var(--glass-border);
-            font-weight: 500;
-            font-size: 12px;
+            font-weight: 500; font-size: 11px;
         }
         .alarm-table td {
-            padding: 8px 10px;
+            padding: 6px 8px;
             border-bottom: 1px solid var(--glass-border);
             color: var(--text-secondary);
-            font-size: 13px;
+            font-size: 12px;
         }
         .alarm-table .ongoing { color: var(--red); }
-
         .empty-hint {
             color: var(--text-dim);
-            text-align: center;
-            padding: 24px;
-            font-size: 14px;
+            text-align: center; padding: 20px; font-size: 13px;
         }
 
         @media (max-width: 1000px) {
-            .main-row { flex-direction: column; }
-            .left-col { flex: auto; }
-            body { padding: 12px; }
-            .top-bar { flex-direction: column; align-items: flex-start; gap: 8px; }
+            .video-row { flex-direction: column; }
+            .bottom-row { flex-direction: column; }
+            .alarm-section { flex: auto; max-height: none; }
         }
     </style>
 </head>
@@ -305,92 +291,123 @@
     <!-- 顶栏 -->
     <div class="top-bar">
         <div>
-            <h1>📊 校园人流量 <span>监测预警</span></h1>
-            <div class="subtitle">Campus Crowd Monitoring &amp; Emergency Alert System</div>
+            <h1>校园人流量 <span>三通道联动监测</span></h1>
+            <div class="subtitle">Multi-Channel Crowd Monitoring &amp; Emergency Evacuation System</div>
         </div>
         <div class="top-right">
-            <div class="fps-badge" id="stm32Status" style="color:var(--text-dim);">○ STM32 离线</div>
-            <div class="fps-badge" id="flameStatus" style="color:var(--text-dim);display:none;">🔥 火焰报警</div>
-            <div class="fps-badge" id="fpsDisplay">FPS: --</div>
+            <div class="badge" id="stm32Status" style="color:var(--text-dim);">○ STM32 离线</div>
+            <div class="badge fire-badge" id="flameBadge">🔥 火焰报警</div>
+            <div class="badge" id="fpsDisplay">FPS: --</div>
         </div>
     </div>
 
-    <!-- 主区域：左视频 + 右统计 -->
-    <div class="main-row">
-        <!-- 左侧列 -->
-        <div class="left-col">
-            <div class="video-box">
-                <div class="live-tag">LIVE</div>
-                <img id="videoFeed" src="/video_feed" alt="视频流">
-            </div>
-            <!-- 控制栏放在视频下方 -->
-            <div class="control-bar">
-                <label>阈值</label>
-                <input type="number" id="thresholdInput" value="5" min="1" max="100"
-                       onfocus="editingThreshold=true" onblur="editingThreshold=false">
-                <button class="btn-set" onclick="setThreshold()">设置</button>
-                <span style="font-size:11px;color:var(--text-dim);">黄<span style="color:var(--amber);font-weight:600;" id="thresholdWarnDisplay">3</span> / 红<span style="color:var(--red);font-weight:600;" id="thresholdRedDisplay">5</span></span>
-                <div class="sep"></div>
-                <button class="btn-alarm-on" onclick="manualAlarm('alarm_on')">⚠️ 报警</button>
-                <button class="btn-alarm-off" onclick="manualAlarm('alarm_off')">解除</button>
-            </div>
-        </div>
-
-        <!-- 右侧列 -->
-        <div class="right-col">
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="label">当前人数</div>
-                    <div class="value c1" id="countDisplay">0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="label">报警状态</div>
-                    <div class="value c4" id="alarmDisplay">正常</div>
-                </div>
-                <div class="stat-card">
-                    <div class="label">今日检测</div>
-                    <div class="value c1" id="totalDet">0</div>
-                </div>
-                <div class="stat-card">
-                    <div class="label">报警 / 峰值</div>
-                    <div class="value c2" id="alarmStats" style="font-size:24px;">0 / 0</div>
-                </div>
-            </div>
-            <div class="chart-box">
-                <canvas id="trendChart"></canvas>
-            </div>
-        </div>
+    <!-- 三列视频区 -->
+    <div class="video-row" id="videoRow">
+        <!-- JS 动态生成 -->
     </div>
 
-    <div class="alarm-banner" id="alarmBanner">⚠️ 超过阈值！请立即疏散！</div>
+    <!-- 联动推荐面板 -->
+    <div class="recommend-panel safe" id="recPanel">
+        <div class="rec-icon" id="recIcon">🟢</div>
+        <div class="rec-text">
+            <div class="rec-title" id="recTitle">各通道正常通行</div>
+            <div class="rec-detail" id="recDetail">所有出口流量正常，无需干预</div>
+        </div>
+        <div class="rec-exit" id="recExit" style="display:none;"></div>
+    </div>
 
-    <!-- 报警历史 -->
-    <div class="alarm-section">
-        <h3>🕐 报警事件记录</h3>
-        <div id="alarmTableWrap">
-            <div class="empty-hint">暂无报警记录</div>
+    <!-- 控制栏 -->
+    <div class="control-bar">
+        <label>阈值</label>
+        <input type="number" id="thresholdInput" value="5" min="1" max="100"
+               onfocus="editingThreshold=true" onblur="editingThreshold=false">
+        <button class="btn btn-set" onclick="setThreshold()">设置</button>
+        <span style="font-size:10px;color:var(--text-dim);">
+            黄<span style="color:var(--amber);font-weight:600;" id="thWarn">3</span>
+            / 红<span style="color:var(--red);font-weight:600;" id="thRed">5</span>
+        </span>
+        <div class="sep"></div>
+        <span style="font-size:11px;color:var(--text-secondary);">火灾模拟:</span>
+        <button class="btn btn-fire-on" id="btnFireB" onclick="fireSimulate('B')">🔥 出口B</button>
+        <button class="btn btn-fire-on" id="btnFireC" onclick="fireSimulate('C')">🔥 出口C</button>
+        <div class="sep"></div>
+        <button class="btn btn-alarm-on" onclick="manualAlarm('alarm_on')">⚠️ 报警</button>
+        <button class="btn btn-alarm-off" onclick="manualAlarm('alarm_off')">解除</button>
+    </div>
+
+    <!-- 底部：折线图 + 报警历史 -->
+    <div class="bottom-row">
+        <div class="chart-box">
+            <canvas id="trendChart"></canvas>
+        </div>
+        <div class="alarm-section">
+            <h3>报警事件记录</h3>
+            <div id="alarmTableWrap">
+                <div class="empty-hint">暂无报警记录</div>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
-    let editingThreshold = false;
+    const CHANNELS = ['A', 'B', 'C'];
+    const CH_NAMES = {
+        'A': '出口 A（正门）', 'B': '出口 B（侧门）', 'C': '出口 C（后门）'
+    };
+    const CH_DESCS = {
+        'A': 'ESP32-CAM 实时流', 'B': 'MP4 模拟视频', 'C': 'MP4 模拟视频'
+    };
 
+    let editingThreshold = false;
+    let fireState = { B: false, C: false };
+
+    // ── 初始化视频窗口 ──────────────────────────
+    const videoRow = document.getElementById('videoRow');
+    CHANNELS.forEach(ch => {
+        const col = document.createElement('div');
+        col.className = 'channel-col';
+        col.innerHTML =
+            `<div class="channel-header">
+                <div>
+                    <div class="ch-name">${CH_NAMES[ch]}</div>
+                    <div class="ch-desc">${CH_DESCS[ch]}</div>
+                </div>
+                <div class="ch-status">
+                    <span class="status-dot" id="dot${ch}"></span>
+                    <span id="alarmLabel${ch}" style="font-size:11px;">正常</span>
+                </div>
+            </div>
+            <div class="channel-video">
+                <img id="video${ch}" src="/video_feed/${ch}" alt="通道 ${ch}">
+                <div class="fire-overlay" id="fireOverlay${ch}"></div>
+                <div class="fire-label" id="fireLabel${ch}">🔥 火灾</div>
+            </div>
+            <div class="channel-stats">
+                <div class="ch-stat">
+                    <div class="val c-blue" id="count${ch}">0</div>
+                    <div class="lbl">人数</div>
+                </div>
+                <div class="ch-stat">
+                    <div class="val" id="fps${ch}" style="color:var(--text-secondary);font-size:14px;">0</div>
+                    <div class="lbl">FPS</div>
+                </div>
+                <div class="ch-stat">
+                    <div class="val c-green" id="fireInd${ch}" style="font-size:14px;">安全</div>
+                    <div class="lbl">状态</div>
+                </div>
+            </div>`;
+        videoRow.appendChild(col);
+    });
+
+    // ── Chart.js ────────────────────────────────
     const ctx = document.getElementById('trendChart').getContext('2d');
     const chart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: [],
-            datasets: [{
-                label: '人数',
-                data: [],
-                borderColor: '#64a8ff',
-                backgroundColor: 'rgba(100,168,255,0.08)',
-                fill: true,
-                tension: 0.3,
-                pointRadius: 1,
-                borderWidth: 2
-            }]
+            datasets: [
+                { label: '总人数', data: [], borderColor: '#64a8ff', backgroundColor: 'rgba(100,168,255,0.08)', fill: true, tension: 0.3, pointRadius: 1, borderWidth: 2 },
+            ]
         },
         options: {
             responsive: true,
@@ -399,78 +416,141 @@
             plugins: { legend: { display: false } },
             scales: {
                 x: {
-                    ticks: { color: 'rgba(255,255,255,0.3)', maxTicksLimit: 6, font: { size: 10 } },
+                    ticks: { color: 'rgba(255,255,255,0.3)', maxTicksLimit: 5, font: { size: 9 } },
                     grid: { color: 'rgba(255,255,255,0.04)' }
                 },
                 y: {
                     beginAtZero: true,
-                    ticks: { color: 'rgba(255,255,255,0.3)', stepSize: 1, font: { size: 10 } },
+                    ticks: { color: 'rgba(255,255,255,0.3)', stepSize: 1, font: { size: 9 } },
                     grid: { color: 'rgba(255,255,255,0.04)' }
                 }
             }
         }
     });
 
+    // ── 更新仪表盘 ─────────────────────────────
     function updateDashboard() {
         fetch('/dashboard')
             .then(r => r.json())
             .then(d => {
-                const data = d.status;
+                // 通道状态
+                let totalFps = 0;
+                CHANNELS.forEach(ch => {
+                    const cd = d.channels[ch];
+                    document.getElementById('count' + ch).textContent = cd.count;
+                    document.getElementById('fps' + ch).textContent = cd.fps;
+                    totalFps += cd.fps;
 
-                document.getElementById('countDisplay').textContent = data.count;
-                document.getElementById('fpsDisplay').textContent = 'FPS: ' + data.fps;
-                document.getElementById('totalDet').textContent = data.today_detections;
-                document.getElementById('alarmStats').textContent = data.today_alarms + ' / ' + data.peak_count;
+                    // 状态灯 + 标签
+                    const dot = document.getElementById('dot' + ch);
+                    const label = document.getElementById('alarmLabel' + ch);
+                    dot.className = 'status-dot';
+                    if (cd.alarm_level === 2) {
+                        dot.classList.add('red');
+                        label.textContent = '红色报警';
+                        label.style.color = 'var(--red)';
+                    } else if (cd.alarm_level === 1) {
+                        dot.classList.add('amber');
+                        label.textContent = '黄色预警';
+                        label.style.color = 'var(--amber)';
+                    } else {
+                        dot.classList.add('green');
+                        label.textContent = '正常';
+                        label.style.color = 'var(--green)';
+                    }
 
-                const statusEl = document.getElementById('stm32Status');
-                if (data.stm32_online) {
-                    statusEl.textContent = '● STM32 在线';
-                    statusEl.style.color = '#5ddb8f';
+                    // 火焰指示
+                    const fireOverlay = document.getElementById('fireOverlay' + ch);
+                    const fireLabel = document.getElementById('fireLabel' + ch);
+                    const fireInd = document.getElementById('fireInd' + ch);
+                    if (cd.fire) {
+                        fireOverlay.classList.add('show');
+                        fireLabel.classList.add('show');
+                        fireInd.textContent = '🔥 火灾';
+                        fireInd.className = 'val c-red';
+                        fireInd.style.fontSize = '14px';
+                    } else {
+                        fireOverlay.classList.remove('show');
+                        fireLabel.classList.remove('show');
+                        fireInd.textContent = '安全';
+                        fireInd.className = 'val c-green';
+                        fireInd.style.fontSize = '14px';
+                    }
+                });
+
+                // FPS 徽章
+                document.getElementById('fpsDisplay').textContent = 'FPS: ' + (totalFps / 3).toFixed(1);
+
+                // STM32 状态
+                const stm = document.getElementById('stm32Status');
+                if (d.status.stm32_online) {
+                    stm.textContent = '● STM32 在线';
+                    stm.className = 'badge online';
                 } else {
-                    statusEl.textContent = '○ STM32 离线';
-                    statusEl.style.color = 'var(--text-dim)';
+                    stm.textContent = '○ STM32 离线';
+                    stm.className = 'badge';
+                    stm.style.color = 'var(--text-dim)';
                 }
 
-                const flameEl = document.getElementById('flameStatus');
-                if (data.flame_active) {
-                    flameEl.style.display = 'inline-block';
-                    flameEl.style.color = '#ff5a5a';
+                // 火焰徽章
+                const fb = document.getElementById('flameBadge');
+                if (d.channels.A.fire) {
+                    fb.style.display = 'inline-block';
                 } else {
-                    flameEl.style.display = 'none';
+                    fb.style.display = 'none';
                 }
 
-                const alarmEl = document.getElementById('alarmDisplay');
-                const banner = document.getElementById('alarmBanner');
-                if (data.alarm_level === 2) {
-                    alarmEl.textContent = '🔴 红色报警';
-                    alarmEl.className = 'value c2';
-                    banner.className = 'alarm-banner red';
-                    banner.textContent = '🔴 红色警报！人数严重超标，请立即疏散！';
-                } else if (data.alarm_level === 1) {
-                    alarmEl.textContent = '⚠️ 黄色预警';
-                    alarmEl.className = 'value c3';
-                    banner.className = 'alarm-banner warn';
-                    banner.textContent = '⚠️ 黄色预警：人数接近阈值，请关注！';
+                // 推荐面板
+                const rec = d.recommendation;
+                const panel = document.getElementById('recPanel');
+                const recIcon = document.getElementById('recIcon');
+                const recTitle = document.getElementById('recTitle');
+                const recDetail = document.getElementById('recDetail');
+                const recExit = document.getElementById('recExit');
+
+                panel.className = 'recommend-panel';
+                recExit.style.display = 'none';
+
+                // 检查是否所有通道都有火灾
+                const allFire = CHANNELS.every(ch => d.channels[ch].fire);
+                const anyRed = CHANNELS.some(ch => d.channels[ch].alarm_level >= 2);
+                const anyAmber = CHANNELS.some(ch => d.channels[ch].alarm_level === 1);
+
+                if (allFire) {
+                    panel.classList.add('all-danger');
+                    recIcon.textContent = '🚫';
+                    recTitle.textContent = '所有通道危险！请立即远离该区域';
+                    recDetail.textContent = '全部通道发生火灾，无安全出口';
+                } else if (rec.exit) {
+                    if (anyRed) panel.classList.add('danger');
+                    recIcon.textContent = '⭐';
+                    recTitle.textContent = '联动疏散建议';
+                    const chName = CH_NAMES[rec.exit];
+                    recDetail.textContent = `检测到拥挤或危险通道，建议人员从 ${chName} 疏散`;
+                    recExit.style.display = 'block';
+                    recExit.textContent = '→ ' + chName;
+                    recExit.className = 'rec-exit';
                 } else {
-                    alarmEl.textContent = '✅ 正常';
-                    alarmEl.className = 'value c4';
-                    banner.className = 'alarm-banner';
+                    panel.classList.add('safe');
+                    recIcon.textContent = '🟢';
+                    recTitle.textContent = '各通道正常通行';
+                    recDetail.textContent = '所有出口流量正常，无需干预';
                 }
 
+                // 阈值
                 if (!editingThreshold) {
-                    document.getElementById('thresholdInput').value = data.threshold;
+                    document.getElementById('thresholdInput').value = d.status.threshold;
                 }
-                const warnEl = document.getElementById('thresholdWarnDisplay');
-                const redEl = document.getElementById('thresholdRedDisplay');
-                if (warnEl) warnEl.textContent = data.threshold_warn;
-                if (redEl) redEl.textContent = data.threshold;
+                document.getElementById('thWarn').textContent = d.status.threshold_warn;
+                document.getElementById('thRed').textContent = d.status.threshold;
 
-                // 折线图
+                // 折线图（聚合总人数，按时间戳去重）
                 const rows = d.history;
-                chart.data.labels = rows.map(r => {
+                const labels = rows.map(r => {
                     const t = r.timestamp.split('T')[1];
                     return t ? t.substring(0, 5) : '';
                 });
+                chart.data.labels = labels;
                 chart.data.datasets[0].data = rows.map(r => r.count);
                 chart.update('none');
 
@@ -481,19 +561,14 @@
                     wrap.innerHTML = '<div class="empty-hint">暂无报警记录</div>';
                 } else {
                     let html = '<table class="alarm-table">'
-                        + '<tr><th>开始时间</th><th>结束时间</th><th>峰值人数</th><th>持续时长</th></tr>';
+                        + '<tr><th>开始</th><th>结束</th><th>峰值</th><th>时长</th></tr>';
                     alarmRows.forEach(r => {
-                        const start = r.start_time.split('T')[1] || r.start_time;
+                        const start = (r.start_time.split('T')[1] || r.start_time).substring(0, 8);
                         const end = r.end_time
-                            ? r.end_time.split('T')[1] || r.end_time
+                            ? (r.end_time.split('T')[1] || r.end_time).substring(0, 8)
                             : '<span class="ongoing">进行中</span>';
                         const dur = r.duration != null ? r.duration + 's' : '-';
-                        html += '<tr>'
-                            + '<td>' + start.substring(0,8) + '</td>'
-                            + '<td>' + end.substring(0,8) + '</td>'
-                            + '<td>' + r.max_count + '</td>'
-                            + '<td>' + dur + '</td>'
-                            + '</tr>';
+                        html += `<tr><td>${start}</td><td>${end}</td><td>${r.max_count}</td><td>${dur}</td></tr>`;
                     });
                     html += '</table>';
                     wrap.innerHTML = html;
@@ -502,22 +577,55 @@
             .catch(() => {});
     }
 
+    // ── 火灾模拟 ────────────────────────────────
+    function fireSimulate(channel) {
+        const btn = document.getElementById('btnFire' + channel);
+        const newState = !fireState[channel];
+        const origText = btn.textContent;
+        btn.textContent = '...';
+        btn.style.opacity = '0.5';
+
+        fetch('/fire_simulate/' + channel, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: newState ? 'on' : 'off' })
+        }).then(r => r.json()).then(d => {
+            btn.style.opacity = '1';
+            if (d.status === 'ok') {
+                fireState[channel] = d.fire;
+                if (d.fire) {
+                    btn.textContent = '🔥 ' + CH_NAMES[channel] + ' 燃烧中';
+                    btn.classList.add('active');
+                } else {
+                    btn.textContent = '🔥 ' + CH_NAMES[channel].replace('出口 ', '出口');
+                    btn.classList.remove('active');
+                }
+            } else {
+                btn.textContent = origText;
+            }
+        }).catch(() => {
+            btn.textContent = origText;
+            btn.style.opacity = '1';
+        });
+    }
+
+    // ── 阈值设置 ────────────────────────────────
     function setThreshold() {
         const val = parseInt(document.getElementById('thresholdInput').value);
-        if (isNaN(val) || val < 1) return alert('请输入有效数字');
+        if (isNaN(val) || val < 1) return;
         fetch('/set_threshold', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ threshold: val })
         }).then(r => r.json()).then(d => {
             if (d.status === 'ok') {
-                alert('红色阈值已设置为 ' + d.threshold + '，黄色阈值 = ' + d.threshold_warn);
-                document.getElementById('thresholdWarnDisplay').textContent = d.threshold_warn;
-                document.getElementById('thresholdRedDisplay').textContent = d.threshold;
+                document.getElementById('thWarn').textContent = d.threshold_warn;
+                document.getElementById('thRed').textContent = d.threshold;
             }
         });
     }
 
+    // ── 手动报警 ────────────────────────────────
     function manualAlarm(action) {
         const btns = document.querySelectorAll('.btn-alarm-on, .btn-alarm-off');
         const btn = action === 'alarm_on' ? btns[0] : btns[1];
@@ -531,7 +639,7 @@
         }).then(r => r.json()).then(d => {
             btn.style.opacity = '1';
             if (d.status === 'ok') {
-                btn.textContent = '✓ 已发送';
+                btn.textContent = '✓';
                 setTimeout(() => { btn.textContent = origText; }, 800);
             } else {
                 btn.textContent = origText;

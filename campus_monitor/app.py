@@ -1,5 +1,5 @@
 """
-校园人流量监测系统 — Flask 应用入口
+校园人流量监测系统（多通道版）— Flask 应用入口
 """
 import threading
 import time
@@ -7,14 +7,14 @@ from flask import Flask, render_template, Response, jsonify, request
 
 from db import init_db, get_recent_records, get_alarm_events, get_today_stats
 import detector
-from tcp_server import tcp_server, tcp_broadcast, broadcast, mqtt_init
-import tcp_server  # 用于访问 tcp_server.stm32_connected
+from tcp_server import tcp_server, broadcast, mqtt_init
+import tcp_server
 
 app = Flask(__name__)
 
-# /video_feed 单连接控制：新连接来踢旧连接，防止浏览器重连导致连接池耗尽
+# ── /video_feed 单连接去重（每通道独立）──────────────
 _feed_lock = threading.Lock()
-_active_feed_stop = None  # 当前活跃连接的停止信号
+_active_feed_stops = {}  # {channel: stop_event}
 
 
 @app.route('/')
@@ -22,33 +22,87 @@ def index():
     return render_template('index.html')
 
 
-@app.route('/video_feed')
-def video_feed():
-    global _active_feed_stop
+@app.route('/video_feed/<channel>')
+def video_feed(channel):
+    if channel not in detector.CHANNELS:
+        return jsonify({'error': 'invalid channel'}), 404
+
     stop_event = threading.Event()
     with _feed_lock:
-        if _active_feed_stop is not None:
-            _active_feed_stop.set()  # 踢掉旧连接
-        _active_feed_stop = stop_event
-    return Response(detector.generate_frames(stop_event=stop_event),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
+        old = _active_feed_stops.get(channel)
+        if old is not None:
+            old.set()
+        _active_feed_stops[channel] = stop_event
+
+    return Response(
+        detector.generate_frames(channel, stop_event=stop_event),
+        mimetype='multipart/x-mixed-replace; boundary=frame'
+    )
 
 
 @app.route('/status')
 def status():
+    """聚合状态（向后兼容）"""
+    total = sum(detector.channel_state[ch]['count'] for ch in detector.CHANNELS)
+    any_alarm = any(detector.channel_state[ch]['alarm_active'] for ch in detector.CHANNELS)
+    max_level = max(detector.channel_state[ch]['alarm_level'] for ch in detector.CHANNELS)
+    avg_fps = sum(detector.channel_state[ch]['fps'] for ch in detector.CHANNELS) / 3.0
+
     stats = get_today_stats()
     return jsonify({
-        'count': detector.person_count,
-        'alarm': detector.alarm_active,
-        'alarm_level': detector.alarm_level,
+        'count': total,
+        'alarm': any_alarm,
+        'alarm_level': max_level,
         'threshold': detector.ALARM_THRESHOLD_RED,
         'threshold_warn': detector.ALARM_THRESHOLD_WARN,
-        'fps': round(detector.current_fps, 1),
+        'fps': round(avg_fps, 1),
         'today_detections': stats['total_detections'],
         'today_alarms': stats['alarm_count'],
         'peak_count': stats['peak_count'],
         'stm32_online': tcp_server.stm32_connected,
-        'flame_active': tcp_server.flame_active
+        'flame_active': tcp_server.flame_active,
+        'recommended_exit': detector.recommended_exit,
+        'servo_open': detector.servo_open,
+    })
+
+
+@app.route('/dashboard')
+def dashboard():
+    """合并接口：三通道状态 + 推荐 + history + alarms"""
+    channels_data = {}
+    for ch in detector.CHANNELS:
+        with detector.channel_locks[ch]:
+            s = detector.channel_state[ch]
+            fire = tcp_server.flame_active if ch == 'A' else s['fire']
+            channels_data[ch] = {
+                'count': s['count'],
+                'alarm_active': s['alarm_active'],
+                'alarm_level': s['alarm_level'],
+                'fps': round(s['fps'], 1),
+                'fire': fire,
+            }
+
+    stats = get_today_stats()
+    history_rows = get_recent_records(20)
+    alarm_rows = get_alarm_events(50)
+
+    return jsonify({
+        'channels': channels_data,
+        'recommendation': {
+            'exit': detector.recommended_exit,
+            'servo_open': detector.servo_open,
+            'buzzer_on': detector.buzzer_on,
+        },
+        'status': {
+            'threshold': detector.ALARM_THRESHOLD_RED,
+            'threshold_warn': detector.ALARM_THRESHOLD_WARN,
+            'today_detections': stats['total_detections'],
+            'today_alarms': stats['alarm_count'],
+            'peak_count': stats['peak_count'],
+            'stm32_online': tcp_server.stm32_connected,
+        },
+        'history': history_rows,
+        'alarms': alarm_rows,
     })
 
 
@@ -67,7 +121,6 @@ def set_threshold():
 
 @app.route('/control', methods=['POST'])
 def manual_control():
-    """网页手动控制 STM32 报警"""
     data = request.get_json()
     if data and 'action' in data:
         action = data['action']
@@ -82,56 +135,55 @@ def manual_control():
     return jsonify({'status': 'error'}), 400
 
 
+@app.route('/fire_simulate/<channel>', methods=['POST'])
+def fire_simulate(channel):
+    """火灾模拟：为通道 B/C 设置虚拟火焰状态（通道 A 由实物传感器控制）"""
+    if channel not in ('B', 'C'):
+        return jsonify({'status': 'error', 'message': '仅通道 B/C 支持火灾模拟'}), 400
+
+    data = request.get_json()
+    if data and 'action' in data:
+        action = data['action']
+        with detector.channel_locks[channel]:
+            if action == 'on':
+                detector.channel_state[channel]['fire'] = True
+                print(f"🔥 [通道 {channel}] 火灾模拟触发！")
+            elif action == 'off':
+                detector.channel_state[channel]['fire'] = False
+                print(f"✅ [通道 {channel}] 火灾模拟解除")
+            else:
+                return jsonify({'status': 'error', 'message': 'action 必须为 on/off'}), 400
+        detector.coordinated_decision()
+        return jsonify({'status': 'ok', 'channel': channel, 'fire': detector.channel_state[channel]['fire']})
+    return jsonify({'status': 'error'}), 400
+
+
 @app.route('/history')
 def history():
-    """返回最近 20 条检测记录（供折线图）"""
     rows = get_recent_records(20)
     return jsonify(rows)
 
 
 @app.route('/alarms')
 def alarms():
-    """返回报警事件列表"""
     rows = get_alarm_events(50)
     return jsonify(rows)
 
 
-@app.route('/dashboard')
-def dashboard():
-    """合并接口：一次返回 status + history + alarms，减少前端轮询连接"""
-    stats = get_today_stats()
-    history_rows = get_recent_records(20)
-    alarm_rows = get_alarm_events(50)
-    return jsonify({
-        'status': {
-            'count': detector.person_count,
-            'alarm': detector.alarm_active,
-            'alarm_level': detector.alarm_level,
-            'threshold': detector.ALARM_THRESHOLD_RED,
-            'threshold_warn': detector.ALARM_THRESHOLD_WARN,
-            'fps': round(detector.current_fps, 1),
-            'today_detections': stats['total_detections'],
-            'today_alarms': stats['alarm_count'],
-            'peak_count': stats['peak_count'],
-            'stm32_online': tcp_server.stm32_connected,
-            'flame_active': tcp_server.flame_active
-        },
-        'history': history_rows,
-        'alarms': alarm_rows
-    })
-
-
 if __name__ == '__main__':
     init_db()
-    print("✅ 数据库已初始化")
+    print("✅ 数据库已初始化（多通道）")
     mqtt_init()
 
-    t1 = threading.Thread(target=detector.detect_loop, daemon=True)
-    t2 = threading.Thread(target=tcp_server, daemon=True)
-    t1.start()
-    t2.start()
+    for ch in detector.CHANNELS:
+        t = threading.Thread(target=detector.detect_loop, args=(ch,), daemon=True)
+        t.start()
+    t_tcp = threading.Thread(target=tcp_server, daemon=True)
+    t_tcp.start()
 
     time.sleep(2)
     print(f"🚀 Web 服务已启动: http://localhost:5000")
+    print(f"   通道 A: ESP32-CAM MJPEG（不可用时 MP4 回退）")
+    print(f"   通道 B/C: MP4 循环播放")
     print(f"🔌 TCP Server: 端口 8888")
     app.run(host='0.0.0.0', port=5000, threaded=True, debug=False)
