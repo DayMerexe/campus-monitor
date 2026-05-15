@@ -70,8 +70,11 @@ ALARM_CONFIRM = 3
 ALARM_LOCK = 3.0
 
 # MQTT 广播节流
+MQTT_MIN_INTERVAL = 0.5  # 最小发送间隔（秒），避免三通道同时发送刷屏
 _last_broadcast_sig = None
 _last_stm32_sig = None
+_last_broadcast_time = 0.0
+_last_stm32_time = 0.0
 
 # ── 加载 YOLO 模型 ───────────────────────────────────
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -130,6 +133,7 @@ def set_source(channel, source_type, path=None):
 # ── 联动决策引擎 ─────────────────────────────────────
 def coordinated_decision():
     global recommended_exit, servo_open, buzzer_on, _last_broadcast_sig, _last_stm32_sig
+    global _last_broadcast_time, _last_stm32_time
 
     with coord_lock:
         snap = {}
@@ -169,8 +173,11 @@ def coordinated_decision():
               f"FIRE_B:{1 if snap['B']['fire'] else 0}," \
               f"FIRE_C:{1 if snap['C']['fire'] else 0}"
         if sig != _last_broadcast_sig:
-            broadcast(sig + '\n')
-            _last_broadcast_sig = sig
+            now_t = time.time()
+            if now_t - _last_broadcast_time >= MQTT_MIN_INTERVAL:
+                broadcast(sig + '\n')
+                _last_broadcast_sig = sig
+                _last_broadcast_time = now_t
 
         # ── MQTT 旧格式（STM32 兼容）──────────────
         total_count = sum(snap[ch]['count'] for ch in CHANNELS)
@@ -181,8 +188,11 @@ def coordinated_decision():
         )
         stm32_msg = f"COUNT:{total_count},ALARM:{effective_level}"
         if stm32_msg != _last_stm32_sig:
-            broadcast(stm32_msg + '\n')
-            _last_stm32_sig = stm32_msg
+            now_t = time.time()
+            if now_t - _last_stm32_time >= MQTT_MIN_INTERVAL:
+                broadcast(stm32_msg + '\n')
+                _last_stm32_sig = stm32_msg
+                _last_stm32_time = now_t
 
 
 # ── 通道 A: MJPEG 读取器 ─────────────────────────────
