@@ -8,6 +8,8 @@ import numpy as np
 import requests
 import threading
 import time
+import os
+import glob
 import torch
 from datetime import datetime
 from ultralytics import YOLO
@@ -23,11 +25,7 @@ CONFIDENCE_THRESHOLD = 0.5
 PERSON_CLASS_ID = 0
 CHANNELS = ['A', 'B', 'C']
 CHANNEL_NAMES = {'A': '出口 A（正门）', 'B': '出口 B（侧门）', 'C': '出口 C（后门）'}
-VIDEO_FILES = {
-    'B': 'videos/channel_b.mp4',
-    'C': 'videos/channel_c.mp4',
-}
-FALLBACK_VIDEO_A = 'videos/channel_a.mp4'
+VIDEOS_DIR = os.path.join(os.path.dirname(__file__), 'videos')
 
 # ── 每通道独立状态 ───────────────────────────────────
 channel_state = {}
@@ -42,6 +40,9 @@ for ch in CHANNELS:
         'fire': False,
         'alarm_event_id': None,
         'alarm_max_count': 0,
+        # 每通道独立阈值
+        'threshold_red': 5,
+        'threshold_warn': 3,
         # 防抖状态
         'consecutive': 0,
         'normal_frames': 0,
@@ -49,15 +50,19 @@ for ch in CHANNELS:
     }
     channel_locks[ch] = threading.Lock()
 
+# ── 视频源配置（可运行时切换）─────────────────────────
+# source_config[ch] = {'type': 'mjpeg'|'mp4', 'path': str|None}
+source_config = {}
+source_config_lock = threading.Lock()
+for ch in CHANNELS:
+    with source_config_lock:
+        source_config[ch] = {'type': 'mjpeg' if ch == 'A' else 'mp4', 'path': None}
+
 # ── 联动决策全局输出 ─────────────────────────────────
 coord_lock = threading.Lock()
-recommended_exit = None  # 'A'/'B'/'C' or None
+recommended_exit = None
 servo_open = False
 buzzer_on = False
-
-# ── 阈值（共享）──────────────────────────────────────
-ALARM_THRESHOLD_RED = 5
-ALARM_THRESHOLD_WARN = 3
 manual_alarm_active = False
 
 # 报警防抖参数（每通道复用）
@@ -65,7 +70,8 @@ ALARM_CONFIRM = 3
 ALARM_LOCK = 3.0
 
 # MQTT 广播节流
-_last_broadcast_sig = None  # 上次发送的签名，变化时才发
+_last_broadcast_sig = None
+_last_stm32_sig = None
 
 # ── 加载 YOLO 模型 ───────────────────────────────────
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -78,20 +84,54 @@ if device == 'cuda':
     print(f"   GPU warmup 完成")
 
 
-def get_target_level(count):
-    if count > ALARM_THRESHOLD_RED:
+def get_target_level(count, channel):
+    """根据当前人数和通道阈值返回目标报警等级"""
+    st = channel_state[channel]
+    if count > st['threshold_red']:
         return 2
-    elif count > ALARM_THRESHOLD_WARN:
+    elif count > st['threshold_warn']:
         return 1
     return 0
 
 
+def set_threshold(channel, red, warn=None):
+    """运行时修改某通道的报警阈值"""
+    if channel not in CHANNELS:
+        return False
+    with channel_locks[channel]:
+        channel_state[channel]['threshold_red'] = red
+        channel_state[channel]['threshold_warn'] = warn if warn is not None else max(1, int(red * 0.8))
+    return True
+
+
+def list_video_files():
+    """扫描 videos/ 目录，返回可用 MP4 文件列表"""
+    if not os.path.isdir(VIDEOS_DIR):
+        return []
+    files = glob.glob(os.path.join(VIDEOS_DIR, '*.mp4'))
+    return [os.path.basename(f) for f in sorted(files)]
+
+
+def set_source(channel, source_type, path=None):
+    """运行时切换通道视频源"""
+    if channel not in CHANNELS:
+        return False, "invalid channel"
+    if channel == 'A' and source_type not in ('mjpeg', 'mp4'):
+        return False, "通道 A 仅支持 mjpeg/mp4"
+    if channel in ('B', 'C') and source_type != 'mp4':
+        return False, "通道 B/C 仅支持 mp4"
+
+    with source_config_lock:
+        source_config[channel] = {'type': source_type, 'path': path}
+    print(f"[通道 {channel}] 视频源已切换: type={source_type}, path={path or '默认'}")
+    return True, None
+
+
 # ── 联动决策引擎 ─────────────────────────────────────
 def coordinated_decision():
-    global recommended_exit, servo_open, buzzer_on, _last_broadcast_sig
+    global recommended_exit, servo_open, buzzer_on, _last_broadcast_sig, _last_stm32_sig
 
     with coord_lock:
-        # 读取各通道状态
         snap = {}
         for ch in CHANNELS:
             with channel_locks[ch]:
@@ -105,17 +145,22 @@ def coordinated_decision():
         # 通道 A 的 fire = 实物火焰传感器
         snap['A']['fire'] = tcp_server.flame_active
 
-        # 联动决策
+        # ── 联动决策 ──────────────────────────────
         safe = [ch for ch in CHANNELS if not snap[ch]['fire']]
         if safe:
             recommended_exit = min(safe, key=lambda ch: snap[ch]['count'])
         else:
             recommended_exit = None
 
-        servo_open = any(snap[ch]['alarm_level'] >= 2 for ch in CHANNELS)
-        buzzer_on = servo_open
+        # 火灾通道视为等效红色报警，任一 red/fire → 舵机开
+        any_danger = any(
+            snap[ch]['alarm_level'] >= 2 or snap[ch]['fire']
+            for ch in CHANNELS
+        )
+        servo_open = any_danger
+        buzzer_on = any_danger
 
-        # MQTT 广播（变化时发送）
+        # ── MQTT 新格式（完整多通道数据）──────────
         sig = f"A:{snap['A']['count']},LA:{snap['A']['alarm_level']}," \
               f"B:{snap['B']['count']},LB:{snap['B']['alarm_level']}," \
               f"C:{snap['C']['count']},LC:{snap['C']['alarm_level']}," \
@@ -126,6 +171,18 @@ def coordinated_decision():
         if sig != _last_broadcast_sig:
             broadcast(sig + '\n')
             _last_broadcast_sig = sig
+
+        # ── MQTT 旧格式（STM32 兼容）──────────────
+        total_count = sum(snap[ch]['count'] for ch in CHANNELS)
+        # 最高报警等级（火灾通道视为 level 2）
+        effective_level = max(
+            (2 if snap[ch]['fire'] else snap[ch]['alarm_level'])
+            for ch in CHANNELS
+        )
+        stm32_msg = f"COUNT:{total_count},ALARM:{effective_level}"
+        if stm32_msg != _last_stm32_sig:
+            broadcast(stm32_msg + '\n')
+            _last_stm32_sig = stm32_msg
 
 
 # ── 通道 A: MJPEG 读取器 ─────────────────────────────
@@ -171,34 +228,54 @@ def _read_mjpeg():
 
 # ── 通道读取 ─────────────────────────────────────────
 def _open_source(channel):
-    """为通道打开输入源。通道 A 返回 'mjpeg'，B/C 返回 cv2.VideoCapture"""
-    if channel == 'A':
-        # 先尝试 ESP32-CAM
+    """根据 source_config 为通道打开输入源"""
+    with source_config_lock:
+        cfg = dict(source_config[channel])
+
+    if cfg['type'] == 'mjpeg':
         try:
             r = requests.get(ESP32_CAM_URL, stream=True, timeout=5)
             r.close()
             print(f"[通道 A] ESP32-CAM 可达，使用 MJPEG 实时流")
             return 'mjpeg'
         except Exception:
-            print(f"[通道 A] ESP32-CAM 不可达，回退 MP4: {FALLBACK_VIDEO_A}")
-            cap = cv2.VideoCapture(FALLBACK_VIDEO_A)
+            print(f"[通道 A] ESP32-CAM 不可达，回退 MP4")
+            # 回退到 MP4
+            path = cfg.get('path') or os.path.join(VIDEOS_DIR, 'channel_a.mp4')
+            cap = cv2.VideoCapture(path)
             if cap.isOpened():
                 return cap
             else:
-                print(f"[通道 A] MP4 回退文件也不可用: {FALLBACK_VIDEO_A}")
+                print(f"[通道 A] MP4 回退文件也不可用: {path}")
                 return None
-    else:
-        path = VIDEO_FILES.get(channel, '')
-        cap = cv2.VideoCapture(path)
-        if cap.isOpened():
-            print(f"[通道 {channel}] MP4 已打开: {path}")
-            return cap
-        else:
-            print(f"[通道 {channel}] 无法打开 MP4: {path}")
-            return None
+
+    elif cfg['type'] == 'mp4':
+        path = cfg.get('path')
+        if not path:
+            # 自动扫描 videos/ 目录找第一个可用 MP4
+            files = list_video_files()
+            for f in files:
+                if channel == 'A' and f.startswith('channel_a'):
+                    path = os.path.join(VIDEOS_DIR, f)
+                    break
+                elif channel in ('B', 'C') and not f.startswith('channel_a'):
+                    path = os.path.join(VIDEOS_DIR, f)
+                    break
+            if not path and files:
+                # 没匹配到，取第一个
+                path = os.path.join(VIDEOS_DIR, files[0])
+        if path:
+            cap = cv2.VideoCapture(path)
+            if cap.isOpened():
+                print(f"[通道 {channel}] MP4 已打开: {os.path.basename(path)}")
+                return cap
+        print(f"[通道 {channel}] 无法打开 MP4: {path or '未指定'}")
+        return None
+
+    return None
 
 
-def _read_frame(channel, source):
+def _read_frame(source):
     """从输入源读取一帧。返回 frame 或 None"""
     if source == 'mjpeg':
         return _read_mjpeg()
@@ -207,7 +284,6 @@ def _read_frame(channel, source):
         if ret:
             return frame
         else:
-            # MP4 播完，循环
             source.set(cv2.CAP_PROP_POS_FRAMES, 0)
             ret, frame = source.read()
             return frame if ret else None
@@ -229,60 +305,40 @@ def detect_loop(channel):
     consecutive = 0
     normal_frames = 0
     last_state_change = 0.0
-    mjpeg_connected = False
-    last_reconnect_attempt = 0.0
-
-    # 持续尝试连接
-    while source is None:
-        source = _open_source(channel)
-        if source is None:
-            print(f"[通道 {channel}] 无可用输入源，5s 后重试...")
-            time.sleep(5)
-
-    if source == 'mjpeg':
-        mjpeg_connected = True
+    last_source_cfg = None
 
     print(f"[通道 {channel}] 检测线程已启动")
 
     while True:
-        # 通道 A MJPEG 断线重连 + 回退
-        if channel == 'A' and mjpeg_connected:
-            if time.time() - last_reconnect_attempt > 30:
-                last_reconnect_attempt = time.time()
-                try:
-                    r = requests.get(ESP32_CAM_URL, stream=True, timeout=5)
-                    r.close()
-                except Exception:
-                    print(f"[通道 A] MJPEG 流断开，回退 MP4")
-                    mjpeg_connected = False
-                    source = cv2.VideoCapture(FALLBACK_VIDEO_A)
-                    if not source.isOpened():
-                        source = None
-        elif channel == 'A' and not mjpeg_connected:
-            # 定期尝试恢复 ESP32-CAM
-            if time.time() - last_reconnect_attempt > 30:
-                last_reconnect_attempt = time.time()
-                try:
-                    r = requests.get(ESP32_CAM_URL, stream=True, timeout=5)
-                    r.close()
-                    print(f"[通道 A] ESP32-CAM 已恢复，切回 MJPEG")
-                    mjpeg_connected = True
-                    source = 'mjpeg'
-                except Exception:
-                    pass
+        # ── 检查视频源是否变更 ────────────────────
+        with source_config_lock:
+            cur_cfg = dict(source_config[channel])
+        if cur_cfg != last_source_cfg:
+            last_source_cfg = cur_cfg
+            # 关闭旧源
+            if source is not None and source != 'mjpeg':
+                source.release()
+            source = None
+            print(f"[通道 {channel}] 视频源配置变更，重新打开...")
 
+        # ── 打开/重连源 ────────────────────────────
         if source is None:
-            time.sleep(5)
             source = _open_source(channel)
-            continue
+            if source is None:
+                time.sleep(3)
+                continue
 
-        frame = _read_frame(channel, source)
+        # ── 读帧 ──────────────────────────────────
+        frame = _read_frame(source)
         if frame is None:
+            if source != 'mjpeg':
+                # MP4 读取失败，尝试重开
+                source.release()
+                source = None
+            time.sleep(0.1)
             continue
 
-        t0 = time.time()
-
-        # YOLO 推理
+        # ── YOLO 推理 ─────────────────────────────
         small = cv2.resize(frame, (320, 240))
         results = model(small, conf=CONFIDENCE_THRESHOLD, verbose=False)
         sx = frame.shape[1] / 320
@@ -291,12 +347,12 @@ def detect_loop(channel):
         count = sum(1 for box in results[0].boxes
                     if int(box.cls[0]) == PERSON_CLASS_ID)
 
-        # ── 三级报警防抖（复用现有算法）─────────────
+        # ── 三级报警防抖（每通道独立阈值）─────────
         now = time.time()
         locked = (now - last_state_change) < ALARM_LOCK
 
         old_level = st['alarm_level']
-        target = get_target_level(count)
+        target = get_target_level(count, channel)
         if target != old_level and not locked:
             consecutive += 1
             normal_frames = 0
@@ -383,7 +439,7 @@ def detect_loop(channel):
 # ── 视频流生成器 ─────────────────────────────────────
 def generate_frames(channel, stop_event=None):
     """视频流生成器（每通道独立）"""
-    interval = 0.05  # ~20 FPS
+    interval = 0.05
     last_send = 0.0
     lk = channel_locks[channel]
     st = channel_state[channel]

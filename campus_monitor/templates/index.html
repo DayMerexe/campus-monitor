@@ -34,7 +34,6 @@
         }
         .container { max-width: 1320px; width: 100%; }
 
-        /* 顶栏 */
         .top-bar {
             display: flex; justify-content: space-between; align-items: flex-end;
             margin-bottom: 16px; padding-bottom: 12px;
@@ -54,7 +53,6 @@
         .badge.online { color: var(--green); }
         .badge.fire-badge { color: var(--red); display: none; }
 
-        /* 三列视频区 */
         .video-row { display: flex; gap: 12px; margin-bottom: 14px; }
         .channel-col {
             flex: 1; min-width: 0;
@@ -67,11 +65,13 @@
         }
         .channel-header {
             display: flex; justify-content: space-between; align-items: center;
-            padding: 10px 14px;
+            padding: 8px 12px;
             border-bottom: 1px solid var(--glass-border);
             background: rgba(0,0,0,0.1);
+            gap: 8px;
+            flex-wrap: wrap;
         }
-        .channel-header .ch-name { font-size: 13px; font-weight: 600; }
+        .channel-header .ch-name { font-size: 12px; font-weight: 600; }
         .channel-header .ch-desc { font-size: 10px; color: var(--text-secondary); }
         .channel-header .ch-status {
             display: flex; align-items: center; gap: 6px;
@@ -88,6 +88,20 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.4; }
         }
+        .ch-source-row {
+            display: flex; align-items: center; gap: 4px;
+            padding: 0 12px 6px;
+            font-size: 10px; color: var(--text-secondary);
+        }
+        .ch-source-row select {
+            padding: 3px 6px; border-radius: 4px;
+            border: 1px solid var(--glass-border);
+            background: rgba(0,0,0,0.2);
+            color: var(--text-primary);
+            font-family: inherit; font-size: 10px;
+            outline: none;
+        }
+
         .channel-video {
             position: relative;
             aspect-ratio: 4/3;
@@ -119,25 +133,48 @@
         .channel-video .fire-label.show { display: block; }
 
         .channel-stats {
-            display: flex; gap: 6px; padding: 10px 14px;
+            display: flex; gap: 4px; padding: 8px 10px;
         }
         .ch-stat {
             flex: 1; text-align: center;
-            padding: 8px 4px;
+            padding: 6px 2px;
             background: rgba(0,0,0,0.12);
             border-radius: 8px;
         }
         .ch-stat .val {
-            font-size: 20px; font-weight: 700;
+            font-size: 18px; font-weight: 700;
             font-variant-numeric: tabular-nums;
         }
-        .ch-stat .lbl { font-size: 10px; color: var(--text-secondary); margin-top: 2px; }
+        .ch-stat .lbl { font-size: 9px; color: var(--text-secondary); margin-top: 2px; }
         .ch-stat .val.c-green { color: var(--green); }
         .ch-stat .val.c-amber { color: var(--amber); }
         .ch-stat .val.c-red { color: var(--red); }
         .ch-stat .val.c-blue { color: var(--blue); }
 
-        /* 推荐面板 */
+        .channel-threshold {
+            display: flex; align-items: center; gap: 4px;
+            padding: 6px 10px 10px;
+            font-size: 10px; color: var(--text-secondary);
+        }
+        .channel-threshold input {
+            padding: 3px 4px; border-radius: 4px;
+            border: 1px solid var(--glass-border);
+            background: rgba(0,0,0,0.15);
+            color: var(--text-primary);
+            font-family: inherit; font-size: 11px;
+            width: 36px; text-align: center; outline: none;
+        }
+        .channel-threshold input:focus {
+            border-color: var(--blue);
+        }
+        .channel-threshold button {
+            padding: 2px 8px; border-radius: 4px;
+            border: 1px solid var(--glass-border);
+            background: rgba(0,0,0,0.15);
+            color: var(--blue);
+            font-family: inherit; font-size: 10px; cursor: pointer;
+        }
+
         .recommend-panel {
             background: var(--glass-bg);
             backdrop-filter: blur(16px);
@@ -160,11 +197,9 @@
             font-size: 18px; font-weight: 700; color: var(--blue);
             background: rgba(100,168,255,0.08);
             padding: 8px 16px; border-radius: 8px;
-            flex-shrink: 0;
+            flex-shrink: 0; display: none;
         }
-        .rec-exit.danger-exit { color: var(--red); background: rgba(255,90,90,0.08); }
 
-        /* 控制栏 */
         .control-bar {
             background: var(--glass-bg);
             backdrop-filter: blur(16px);
@@ -181,19 +216,6 @@
             background: var(--glass-border);
             margin: 0 4px;
         }
-        .control-bar label { color: var(--text-secondary); font-size: 12px; }
-        .control-bar input {
-            padding: 6px 8px; border-radius: 6px;
-            border: 1px solid var(--glass-border);
-            background: rgba(0,0,0,0.15);
-            color: var(--text-primary);
-            font-family: inherit; font-size: 14px;
-            width: 56px; text-align: center; outline: none;
-        }
-        .control-bar input:focus {
-            border-color: var(--blue);
-            box-shadow: 0 0 0 3px rgba(100,168,255,0.1);
-        }
         .btn {
             padding: 6px 14px; border-radius: 6px;
             border: 1px solid var(--glass-border);
@@ -204,7 +226,6 @@
             color: var(--text-primary);
         }
         .btn:hover { background: var(--glass-hover); }
-        .btn-set { color: var(--blue); }
         .btn-fire-on {
             color: #ff6b3a; border-color: rgba(255,107,58,0.2);
             background: rgba(255,107,58,0.06);
@@ -214,11 +235,6 @@
             background: rgba(255,60,30,0.15);
             border-color: rgba(255,60,30,0.4);
             color: #ff3a1a;
-        }
-        .btn-fire-off {
-            color: var(--green);
-            border-color: rgba(93,219,143,0.2);
-            background: rgba(93,219,143,0.06);
         }
         .btn-alarm-on {
             color: var(--red);
@@ -231,7 +247,6 @@
             background: rgba(93,219,143,0.06);
         }
 
-        /* 折线图 + 报警历史 */
         .bottom-row { display: flex; gap: 14px; }
         .chart-box {
             flex: 1;
@@ -255,29 +270,12 @@
             max-height: 300px;
             overflow-y: auto;
         }
-        .alarm-section h3 {
-            font-size: 12px; font-weight: 600;
-            color: var(--text-secondary);
-            margin-bottom: 10px;
-        }
+        .alarm-section h3 { font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 10px; }
         .alarm-table { width: 100%; border-collapse: collapse; }
-        .alarm-table th {
-            text-align: left; padding: 6px 8px;
-            color: var(--text-dim);
-            border-bottom: 1px solid var(--glass-border);
-            font-weight: 500; font-size: 11px;
-        }
-        .alarm-table td {
-            padding: 6px 8px;
-            border-bottom: 1px solid var(--glass-border);
-            color: var(--text-secondary);
-            font-size: 12px;
-        }
+        .alarm-table th { text-align: left; padding: 6px 8px; color: var(--text-dim); border-bottom: 1px solid var(--glass-border); font-weight: 500; font-size: 11px; }
+        .alarm-table td { padding: 6px 8px; border-bottom: 1px solid var(--glass-border); color: var(--text-secondary); font-size: 12px; }
         .alarm-table .ongoing { color: var(--red); }
-        .empty-hint {
-            color: var(--text-dim);
-            text-align: center; padding: 20px; font-size: 13px;
-        }
+        .empty-hint { color: var(--text-dim); text-align: center; padding: 20px; font-size: 13px; }
 
         @media (max-width: 1000px) {
             .video-row { flex-direction: column; }
@@ -288,7 +286,6 @@
 </head>
 <body>
 <div class="container">
-    <!-- 顶栏 -->
     <div class="top-bar">
         <div>
             <h1>校园人流量 <span>三通道联动监测</span></h1>
@@ -301,103 +298,112 @@
         </div>
     </div>
 
-    <!-- 三列视频区 -->
-    <div class="video-row" id="videoRow">
-        <!-- JS 动态生成 -->
-    </div>
+    <div class="video-row" id="videoRow"><!-- JS 动态生成 --></div>
 
-    <!-- 联动推荐面板 -->
     <div class="recommend-panel safe" id="recPanel">
         <div class="rec-icon" id="recIcon">🟢</div>
         <div class="rec-text">
             <div class="rec-title" id="recTitle">各通道正常通行</div>
             <div class="rec-detail" id="recDetail">所有出口流量正常，无需干预</div>
         </div>
-        <div class="rec-exit" id="recExit" style="display:none;"></div>
+        <div class="rec-exit" id="recExit"></div>
     </div>
 
-    <!-- 控制栏 -->
     <div class="control-bar">
-        <label>阈值</label>
-        <input type="number" id="thresholdInput" value="5" min="1" max="100"
-               onfocus="editingThreshold=true" onblur="editingThreshold=false">
-        <button class="btn btn-set" onclick="setThreshold()">设置</button>
-        <span style="font-size:10px;color:var(--text-dim);">
-            黄<span style="color:var(--amber);font-weight:600;" id="thWarn">3</span>
-            / 红<span style="color:var(--red);font-weight:600;" id="thRed">5</span>
-        </span>
-        <div class="sep"></div>
         <span style="font-size:11px;color:var(--text-secondary);">火灾模拟:</span>
         <button class="btn btn-fire-on" id="btnFireB" onclick="fireSimulate('B')">🔥 出口B</button>
         <button class="btn btn-fire-on" id="btnFireC" onclick="fireSimulate('C')">🔥 出口C</button>
         <div class="sep"></div>
-        <button class="btn btn-alarm-on" onclick="manualAlarm('alarm_on')">⚠️ 报警</button>
+        <button class="btn btn-alarm-on" onclick="manualAlarm('alarm_on')">⚠️ 手动报警</button>
         <button class="btn btn-alarm-off" onclick="manualAlarm('alarm_off')">解除</button>
     </div>
 
-    <!-- 底部：折线图 + 报警历史 -->
     <div class="bottom-row">
-        <div class="chart-box">
-            <canvas id="trendChart"></canvas>
-        </div>
+        <div class="chart-box"><canvas id="trendChart"></canvas></div>
         <div class="alarm-section">
             <h3>报警事件记录</h3>
-            <div id="alarmTableWrap">
-                <div class="empty-hint">暂无报警记录</div>
-            </div>
+            <div id="alarmTableWrap"><div class="empty-hint">暂无报警记录</div></div>
         </div>
     </div>
 </div>
 
 <script>
     const CHANNELS = ['A', 'B', 'C'];
-    const CH_NAMES = {
-        'A': '出口 A（正门）', 'B': '出口 B（侧门）', 'C': '出口 C（后门）'
-    };
-    const CH_DESCS = {
-        'A': 'ESP32-CAM 实时流', 'B': 'MP4 模拟视频', 'C': 'MP4 模拟视频'
-    };
+    const CH_NAMES = { 'A': '出口 A（正门）', 'B': '出口 B（侧门）', 'C': '出口 C（后门）' };
+    const CH_DESCS = { 'A': 'ESP32-CAM 实时流', 'B': 'MP4 模拟视频', 'C': 'MP4 模拟视频' };
 
-    let editingThreshold = false;
     let fireState = { B: false, C: false };
+    let videoFiles = [];
 
-    // ── 初始化视频窗口 ──────────────────────────
-    const videoRow = document.getElementById('videoRow');
-    CHANNELS.forEach(ch => {
-        const col = document.createElement('div');
-        col.className = 'channel-col';
-        col.innerHTML =
-            `<div class="channel-header">
-                <div>
-                    <div class="ch-name">${CH_NAMES[ch]}</div>
-                    <div class="ch-desc">${CH_DESCS[ch]}</div>
+    // ── 加载 MP4 文件列表 ─────────────────────────
+    fetch('/list_videos').then(r => r.json()).then(d => { videoFiles = d.files; buildUI(); });
+
+    function buildUI() {
+        const videoRow = document.getElementById('videoRow');
+        videoRow.innerHTML = '';
+        CHANNELS.forEach(ch => {
+            let srcOpts = '';
+            if (ch === 'A') {
+                srcOpts = '<option value="mjpeg">ESP32-CAM</option>';
+                videoFiles.forEach(f => {
+                    srcOpts += `<option value="mp4:${f}">MP4: ${f}</option>`;
+                });
+            } else {
+                videoFiles.forEach(f => {
+                    const sel = f.includes('channel_' + ch.toLowerCase()) ? ' selected' : '';
+                    srcOpts += `<option value="mp4:${f}"${sel}>${f}</option>`;
+                });
+                if (!srcOpts) srcOpts = '<option value="">无可用视频</option>';
+            }
+
+            const col = document.createElement('div');
+            col.className = 'channel-col';
+            col.innerHTML =
+                `<div class="channel-header">
+                    <div>
+                        <div class="ch-name">${CH_NAMES[ch]}</div>
+                        <div class="ch-desc">${CH_DESCS[ch]}</div>
+                    </div>
+                    <div class="ch-status">
+                        <span class="status-dot" id="dot${ch}"></span>
+                        <span id="alarmLabel${ch}" style="font-size:11px;">正常</span>
+                    </div>
                 </div>
-                <div class="ch-status">
-                    <span class="status-dot" id="dot${ch}"></span>
-                    <span id="alarmLabel${ch}" style="font-size:11px;">正常</span>
+                <div class="ch-source-row">
+                    <span>源:</span>
+                    <select id="srcSel${ch}" onchange="changeSource('${ch}')" style="flex:1;min-width:0;">
+                        ${srcOpts}
+                    </select>
                 </div>
-            </div>
-            <div class="channel-video">
-                <img id="video${ch}" src="/video_feed/${ch}" alt="通道 ${ch}">
-                <div class="fire-overlay" id="fireOverlay${ch}"></div>
-                <div class="fire-label" id="fireLabel${ch}">🔥 火灾</div>
-            </div>
-            <div class="channel-stats">
-                <div class="ch-stat">
-                    <div class="val c-blue" id="count${ch}">0</div>
-                    <div class="lbl">人数</div>
+                <div class="channel-video">
+                    <img id="video${ch}" src="/video_feed/${ch}" alt="通道 ${ch}">
+                    <div class="fire-overlay" id="fireOverlay${ch}"></div>
+                    <div class="fire-label" id="fireLabel${ch}">🔥 火灾</div>
                 </div>
-                <div class="ch-stat">
-                    <div class="val" id="fps${ch}" style="color:var(--text-secondary);font-size:14px;">0</div>
-                    <div class="lbl">FPS</div>
+                <div class="channel-stats">
+                    <div class="ch-stat">
+                        <div class="val c-blue" id="count${ch}">0</div>
+                        <div class="lbl">人数</div>
+                    </div>
+                    <div class="ch-stat">
+                        <div class="val" id="fps${ch}" style="color:var(--text-secondary);font-size:14px;">0</div>
+                        <div class="lbl">FPS</div>
+                    </div>
+                    <div class="ch-stat">
+                        <div class="val c-red" id="fireInd${ch}" style="font-size:14px;display:none;">🔥 火灾</div>
+                        <div class="lbl" id="fireIndLbl${ch}" style="display:none;">状态</div>
+                    </div>
                 </div>
-                <div class="ch-stat">
-                    <div class="val c-green" id="fireInd${ch}" style="font-size:14px;">安全</div>
-                    <div class="lbl">状态</div>
-                </div>
-            </div>`;
-        videoRow.appendChild(col);
-    });
+                <div class="channel-threshold">
+                    <span>阈值:</span>
+                    <input type="number" id="thRed${ch}" value="5" min="1" max="100" style="width:32px;">
+                    <span style="color:var(--amber);">黄</span><span id="thWarn${ch}" style="color:var(--amber);font-weight:600;">3</span>
+                    <span style="color:var(--red);">红</span>
+                    <button onclick="setThreshold('${ch}')">设置</button>
+                </div>`;
+            videoRow.appendChild(col);
+        });
+    }
 
     // ── Chart.js ────────────────────────────────
     const ctx = document.getElementById('trendChart').getContext('2d');
@@ -410,30 +416,41 @@
             ]
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: { duration: 300 },
+            responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
             plugins: { legend: { display: false } },
             scales: {
-                x: {
-                    ticks: { color: 'rgba(255,255,255,0.3)', maxTicksLimit: 5, font: { size: 9 } },
-                    grid: { color: 'rgba(255,255,255,0.04)' }
-                },
-                y: {
-                    beginAtZero: true,
-                    ticks: { color: 'rgba(255,255,255,0.3)', stepSize: 1, font: { size: 9 } },
-                    grid: { color: 'rgba(255,255,255,0.04)' }
-                }
+                x: { ticks: { color: 'rgba(255,255,255,0.3)', maxTicksLimit: 5, font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                y: { beginAtZero: true, ticks: { color: 'rgba(255,255,255,0.3)', stepSize: 1, font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.04)' } }
             }
         }
     });
+
+    // ── 视频源切换 ───────────────────────────────
+    function changeSource(channel) {
+        const sel = document.getElementById('srcSel' + channel);
+        const val = sel.value;
+        if (!val) return;
+        const parts = val.split(':');
+        const type = parts[0];
+        const path = parts.length > 1 ? parts[1] : null;
+        fetch('/set_source/' + channel, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: type, path: path || null })
+        }).then(r => r.json()).then(d => {
+            if (d.status === 'ok') {
+                // 刷新视频流
+                const img = document.getElementById('video' + channel);
+                img.src = '/video_feed/' + channel + '?t=' + Date.now();
+            }
+        });
+    }
 
     // ── 更新仪表盘 ─────────────────────────────
     function updateDashboard() {
         fetch('/dashboard')
             .then(r => r.json())
             .then(d => {
-                // 通道状态
                 let totalFps = 0;
                 CHANNELS.forEach(ch => {
                     const cd = d.channels[ch];
@@ -441,7 +458,7 @@
                     document.getElementById('fps' + ch).textContent = cd.fps;
                     totalFps += cd.fps;
 
-                    // 状态灯 + 标签
+                    // 状态灯
                     const dot = document.getElementById('dot' + ch);
                     const label = document.getElementById('alarmLabel' + ch);
                     dot.className = 'status-dot';
@@ -459,29 +476,36 @@
                         label.style.color = 'var(--green)';
                     }
 
-                    // 火焰指示
+                    // 火焰指示（仅火情时显示）
                     const fireOverlay = document.getElementById('fireOverlay' + ch);
                     const fireLabel = document.getElementById('fireLabel' + ch);
                     const fireInd = document.getElementById('fireInd' + ch);
+                    const fireIndLbl = document.getElementById('fireIndLbl' + ch);
                     if (cd.fire) {
                         fireOverlay.classList.add('show');
                         fireLabel.classList.add('show');
-                        fireInd.textContent = '🔥 火灾';
-                        fireInd.className = 'val c-red';
-                        fireInd.style.fontSize = '14px';
+                        fireInd.style.display = '';
+                        fireIndLbl.style.display = '';
                     } else {
                         fireOverlay.classList.remove('show');
                         fireLabel.classList.remove('show');
-                        fireInd.textContent = '安全';
-                        fireInd.className = 'val c-green';
-                        fireInd.style.fontSize = '14px';
+                        fireInd.style.display = 'none';
+                        fireIndLbl.style.display = 'none';
+                    }
+
+                    // 阈值显示
+                    const thWarn = document.getElementById('thWarn' + ch);
+                    const thRed = document.getElementById('thRed' + ch);
+                    if (thWarn) thWarn.textContent = cd.threshold_warn;
+                    const inputEl = document.getElementById('thRed' + ch);
+                    if (inputEl && document.activeElement !== inputEl) {
+                        inputEl.value = cd.threshold_red;
                     }
                 });
 
-                // FPS 徽章
                 document.getElementById('fpsDisplay').textContent = 'FPS: ' + (totalFps / 3).toFixed(1);
 
-                // STM32 状态
+                // STM32
                 const stm = document.getElementById('stm32Status');
                 if (d.status.stm32_online) {
                     stm.textContent = '● STM32 在线';
@@ -492,13 +516,10 @@
                     stm.style.color = 'var(--text-dim)';
                 }
 
-                // 火焰徽章
+                // 火焰徽章（任一通道 fire=true 即显示）
+                const anyFire = CHANNELS.some(ch => d.channels[ch].fire);
                 const fb = document.getElementById('flameBadge');
-                if (d.channels.A.fire) {
-                    fb.style.display = 'inline-block';
-                } else {
-                    fb.style.display = 'none';
-                }
+                fb.style.display = anyFire ? 'inline-block' : 'none';
 
                 // 推荐面板
                 const rec = d.recommendation;
@@ -511,10 +532,8 @@
                 panel.className = 'recommend-panel';
                 recExit.style.display = 'none';
 
-                // 检查是否所有通道都有火灾
                 const allFire = CHANNELS.every(ch => d.channels[ch].fire);
                 const anyRed = CHANNELS.some(ch => d.channels[ch].alarm_level >= 2);
-                const anyAmber = CHANNELS.some(ch => d.channels[ch].alarm_level === 1);
 
                 if (allFire) {
                     panel.classList.add('all-danger');
@@ -525,10 +544,9 @@
                     if (anyRed) panel.classList.add('danger');
                     recIcon.textContent = '⭐';
                     recTitle.textContent = '联动疏散建议';
-                    const chName = CH_NAMES[rec.exit];
-                    recDetail.textContent = `检测到拥挤或危险通道，建议人员从 ${chName} 疏散`;
+                    recDetail.textContent = `检测到拥挤或危险通道，建议人员从 ${CH_NAMES[rec.exit]} 疏散`;
                     recExit.style.display = 'block';
-                    recExit.textContent = '→ ' + chName;
+                    recExit.textContent = '→ ' + CH_NAMES[rec.exit];
                     recExit.className = 'rec-exit';
                 } else {
                     panel.classList.add('safe');
@@ -537,20 +555,12 @@
                     recDetail.textContent = '所有出口流量正常，无需干预';
                 }
 
-                // 阈值
-                if (!editingThreshold) {
-                    document.getElementById('thresholdInput').value = d.status.threshold;
-                }
-                document.getElementById('thWarn').textContent = d.status.threshold_warn;
-                document.getElementById('thRed').textContent = d.status.threshold;
-
-                // 折线图（聚合总人数，按时间戳去重）
+                // 折线图
                 const rows = d.history;
-                const labels = rows.map(r => {
+                chart.data.labels = rows.map(r => {
                     const t = r.timestamp.split('T')[1];
                     return t ? t.substring(0, 5) : '';
                 });
-                chart.data.labels = labels;
                 chart.data.datasets[0].data = rows.map(r => r.count);
                 chart.update('none');
 
@@ -560,8 +570,7 @@
                 if (!alarmRows.length) {
                     wrap.innerHTML = '<div class="empty-hint">暂无报警记录</div>';
                 } else {
-                    let html = '<table class="alarm-table">'
-                        + '<tr><th>开始</th><th>结束</th><th>峰值</th><th>时长</th></tr>';
+                    let html = '<table class="alarm-table"><tr><th>开始</th><th>结束</th><th>峰值</th><th>时长</th></tr>';
                     alarmRows.forEach(r => {
                         const start = (r.start_time.split('T')[1] || r.start_time).substring(0, 8);
                         const end = r.end_time
@@ -575,6 +584,21 @@
                 }
             })
             .catch(() => {});
+    }
+
+    // ── 每通道阈值设置 ────────────────────────────
+    function setThreshold(channel) {
+        const val = parseInt(document.getElementById('thRed' + channel).value);
+        if (isNaN(val) || val < 1) return;
+        fetch('/set_threshold/' + channel, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ threshold: val })
+        }).then(r => r.json()).then(d => {
+            if (d.status === 'ok') {
+                document.getElementById('thWarn' + channel).textContent = d.threshold_warn;
+            }
+        });
     }
 
     // ── 火灾模拟 ────────────────────────────────
@@ -597,7 +621,7 @@
                     btn.textContent = '🔥 ' + CH_NAMES[channel] + ' 燃烧中';
                     btn.classList.add('active');
                 } else {
-                    btn.textContent = '🔥 ' + CH_NAMES[channel].replace('出口 ', '出口');
+                    btn.textContent = '🔥 出口' + channel;
                     btn.classList.remove('active');
                 }
             } else {
@@ -606,22 +630,6 @@
         }).catch(() => {
             btn.textContent = origText;
             btn.style.opacity = '1';
-        });
-    }
-
-    // ── 阈值设置 ────────────────────────────────
-    function setThreshold() {
-        const val = parseInt(document.getElementById('thresholdInput').value);
-        if (isNaN(val) || val < 1) return;
-        fetch('/set_threshold', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ threshold: val })
-        }).then(r => r.json()).then(d => {
-            if (d.status === 'ok') {
-                document.getElementById('thWarn').textContent = d.threshold_warn;
-                document.getElementById('thRed').textContent = d.threshold;
-            }
         });
     }
 
@@ -651,7 +659,7 @@
     }
 
     setInterval(updateDashboard, 3000);
-    updateDashboard();
+    setTimeout(updateDashboard, 500);
 </script>
 </body>
 </html>

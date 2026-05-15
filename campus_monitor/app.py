@@ -3,6 +3,7 @@
 """
 import threading
 import time
+import os
 from flask import Flask, render_template, Response, jsonify, request
 
 from db import init_db, get_recent_records, get_alarm_events, get_today_stats
@@ -14,7 +15,7 @@ app = Flask(__name__)
 
 # ── /video_feed 单连接去重（每通道独立）──────────────
 _feed_lock = threading.Lock()
-_active_feed_stops = {}  # {channel: stop_event}
+_active_feed_stops = {}
 
 
 @app.route('/')
@@ -53,8 +54,6 @@ def status():
         'count': total,
         'alarm': any_alarm,
         'alarm_level': max_level,
-        'threshold': detector.ALARM_THRESHOLD_RED,
-        'threshold_warn': detector.ALARM_THRESHOLD_WARN,
         'fps': round(avg_fps, 1),
         'today_detections': stats['total_detections'],
         'today_alarms': stats['alarm_count'],
@@ -80,6 +79,8 @@ def dashboard():
                 'alarm_level': s['alarm_level'],
                 'fps': round(s['fps'], 1),
                 'fire': fire,
+                'threshold_red': s['threshold_red'],
+                'threshold_warn': s['threshold_warn'],
             }
 
     stats = get_today_stats()
@@ -94,8 +95,6 @@ def dashboard():
             'buzzer_on': detector.buzzer_on,
         },
         'status': {
-            'threshold': detector.ALARM_THRESHOLD_RED,
-            'threshold_warn': detector.ALARM_THRESHOLD_WARN,
             'today_detections': stats['total_detections'],
             'today_alarms': stats['alarm_count'],
             'peak_count': stats['peak_count'],
@@ -106,17 +105,55 @@ def dashboard():
     })
 
 
-@app.route('/set_threshold', methods=['POST'])
-def set_threshold():
+@app.route('/set_threshold/<channel>', methods=['POST'])
+def set_threshold(channel):
+    """每通道独立阈值设置"""
+    if channel not in detector.CHANNELS:
+        return jsonify({'status': 'error', 'message': 'invalid channel'}), 400
+
     data = request.get_json()
     if data and 'threshold' in data:
         red = int(data['threshold'])
         warn = max(1, int(red * 0.8))
-        detector.ALARM_THRESHOLD_RED = red
-        detector.ALARM_THRESHOLD_WARN = warn
-        print(f"阈值已更新: 红色={red}, 黄色={warn}")
-        return jsonify({'status': 'ok', 'threshold': red, 'threshold_warn': warn})
+        if 'threshold_warn' in data:
+            warn = int(data['threshold_warn'])
+        detector.set_threshold(channel, red, warn)
+        with detector.channel_locks[channel]:
+            actual_warn = detector.channel_state[channel]['threshold_warn']
+        print(f"[通道 {channel}] 阈值已更新: 红色={red}, 黄色={actual_warn}")
+        return jsonify({'status': 'ok', 'channel': channel, 'threshold': red, 'threshold_warn': actual_warn})
     return jsonify({'status': 'error'}), 400
+
+
+@app.route('/list_videos')
+def list_videos():
+    """返回 videos/ 目录下可用 MP4 文件列表"""
+    files = detector.list_video_files()
+    return jsonify({'files': files})
+
+
+@app.route('/set_source/<channel>', methods=['POST'])
+def set_source(channel):
+    """切换通道视频源"""
+    if channel not in detector.CHANNELS:
+        return jsonify({'status': 'error', 'message': 'invalid channel'}), 400
+
+    data = request.get_json()
+    if not data or 'type' not in data:
+        return jsonify({'status': 'error', 'message': '需要 type 字段'}), 400
+
+    source_type = data['type']
+    path = data.get('path')
+
+    # path 是文件名时补全路径
+    if path and not os.path.isabs(path):
+        path = os.path.join(detector.VIDEOS_DIR, path)
+
+    ok, err = detector.set_source(channel, source_type, path)
+    if not ok:
+        return jsonify({'status': 'error', 'message': err}), 400
+
+    return jsonify({'status': 'ok', 'channel': channel, 'type': source_type, 'path': path})
 
 
 @app.route('/control', methods=['POST'])
@@ -184,6 +221,6 @@ if __name__ == '__main__':
     time.sleep(2)
     print(f"🚀 Web 服务已启动: http://localhost:5000")
     print(f"   通道 A: ESP32-CAM MJPEG（不可用时 MP4 回退）")
-    print(f"   通道 B/C: MP4 循环播放")
+    print(f"   通道 B/C: MP4 循环播放（videos/ 目录自动扫描）")
     print(f"🔌 TCP Server: 端口 8888")
     app.run(host='0.0.0.0', port=5000, threaded=True, debug=False)
