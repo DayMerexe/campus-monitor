@@ -65,6 +65,21 @@ servo_open = False
 buzzer_on = False
 manual_alarm_active = False
 
+# ── STM32 手动绑定 ──────────────────────────────────
+stm32_binding = 'A'
+binding_lock = threading.Lock()
+
+
+def set_binding(channel):
+    """手动切换 STM32 绑定的监控通道"""
+    global stm32_binding
+    if channel not in CHANNELS:
+        return False
+    with binding_lock:
+        stm32_binding = channel
+    return True
+
+
 # 报警防抖参数（每通道复用）
 ALARM_CONFIRM = 3
 ALARM_LOCK = 3.0
@@ -149,29 +164,38 @@ def coordinated_decision():
         # 通道 A 的 fire = 实物火焰传感器
         snap['A']['fire'] = tcp_server.flame_active
 
-        # ── 联动决策 ──────────────────────────────
+        # ── 联动决策（全局推荐，不受绑定影响）───
         safe = [ch for ch in CHANNELS if not snap[ch]['fire']]
         if safe:
             recommended_exit = min(safe, key=lambda ch: snap[ch]['count'])
         else:
             recommended_exit = None
 
-        # 火灾通道视为等效红色报警，任一 red/fire → 舵机开
-        any_danger = any(
-            snap[ch]['alarm_level'] >= 2 or snap[ch]['fire']
-            for ch in CHANNELS
-        )
-        servo_open = any_danger
-        buzzer_on = any_danger
+        # ── STM32 绑定通道决策 ──────────────────
+        with binding_lock:
+            bound_ch = stm32_binding
+        bound = snap[bound_ch]
+        bound_alarm = bound['alarm_level']
+        bound_fire = bound['fire']
 
-        # ── MQTT 新格式（完整多通道数据）──────────
+        # LV: 绑定通道火灾=2，否则取自身报警等级
+        lv = 2 if bound_fire else bound_alarm
+        buz = 1 if (lv >= 1) else 0
+        servo = 1 if (lv >= 2) else 0
+
+        # 全局 servo/buzzer 状态 = 火焰传感器 OR 绑定通道
+        servo_open = tcp_server.flame_active or (servo == 1)
+        buzzer_on = tcp_server.flame_active or (buz == 1)
+
+        # ── MQTT 新格式（完整多通道数据 + 绑定）─
         sig = f"A:{snap['A']['count']},LA:{snap['A']['alarm_level']}," \
               f"B:{snap['B']['count']},LB:{snap['B']['alarm_level']}," \
               f"C:{snap['C']['count']},LC:{snap['C']['alarm_level']}," \
               f"REC:{recommended_exit or 'X'}," \
               f"FIRE_A:{1 if snap['A']['fire'] else 0}," \
               f"FIRE_B:{1 if snap['B']['fire'] else 0}," \
-              f"FIRE_C:{1 if snap['C']['fire'] else 0}"
+              f"FIRE_C:{1 if snap['C']['fire'] else 0}," \
+              f"BIND:{bound_ch}"
         if sig != _last_broadcast_sig:
             now_t = time.time()
             if now_t - _last_broadcast_time >= MQTT_MIN_INTERVAL:
@@ -179,14 +203,8 @@ def coordinated_decision():
                 _last_broadcast_sig = sig
                 _last_broadcast_time = now_t
 
-        # ── MQTT 旧格式（STM32 兼容）──────────────
-        total_count = sum(snap[ch]['count'] for ch in CHANNELS)
-        # 最高报警等级（火灾通道视为 level 2）
-        effective_level = max(
-            (2 if snap[ch]['fire'] else snap[ch]['alarm_level'])
-            for ch in CHANNELS
-        )
-        stm32_msg = f"COUNT:{total_count},ALARM:{effective_level}"
+        # ── MQTT STM32 短指令（替换旧 COUNT:ALARM 格式）─
+        stm32_msg = f"LV:{lv},BUZ:{buz},SERVO:{servo}"
         if stm32_msg != _last_stm32_sig:
             now_t = time.time()
             if now_t - _last_stm32_time >= MQTT_MIN_INTERVAL:

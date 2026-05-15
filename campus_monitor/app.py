@@ -93,6 +93,7 @@ def dashboard():
             'exit': detector.recommended_exit,
             'servo_open': detector.servo_open,
             'buzzer_on': detector.buzzer_on,
+            'stm32_binding': detector.stm32_binding,
         },
         'status': {
             'today_detections': stats['total_detections'],
@@ -193,6 +194,24 @@ def fire_simulate(channel):
         detector.coordinated_decision()
         return jsonify({'status': 'ok', 'channel': channel, 'fire': detector.channel_state[channel]['fire']})
     return jsonify({'status': 'error'}), 400
+
+
+@app.route('/bind_stm32/<channel>', methods=['POST'])
+def bind_stm32(channel):
+    """手动切换 STM32 绑定的监控通道"""
+    if channel not in detector.CHANNELS:
+        return jsonify({'status': 'error', 'message': 'invalid channel'}), 400
+    ok = detector.set_binding(channel)
+    if not ok:
+        return jsonify({'status': 'error', 'message': 'invalid channel'}), 400
+    print(f"[绑定] STM32 已切换到通道 {channel}")
+    return jsonify({'status': 'ok', 'binding': channel})
+
+
+@app.route('/get_binding')
+def get_binding():
+    """获取当前 STM32 绑定状态"""
+    return jsonify({'binding': detector.stm32_binding})
 
 
 @app.route('/history')

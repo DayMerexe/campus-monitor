@@ -40,6 +40,8 @@ uint8_t  rx_idx = 0;
 uint8_t  flame_alarm = 0;    // 火焰传感器报警（独立于 MQTT）
 uint8_t  flame_debounce = 0; // 火焰防抖计数器
 uint8_t  gate_open = 0;      // 闸门是否已开
+uint8_t  mqtt_lv = 0;        // MQTT 上次下发的报警等级
+uint8_t  mqtt_servo = 0;     // MQTT 上次下发的舵机指令
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -187,8 +189,9 @@ int main(void)
           if (flame_debounce > 0) flame_debounce--;
           if (flame_debounce == 0 && flame_alarm) {
             flame_alarm = 0;
-            set_outputs(0);        /* 恢复正常 */
-            servo_close_gate();
+            set_outputs(mqtt_lv);  /* 恢复到 MQTT 上次状态 */
+            if (mqtt_servo) servo_open_gate();
+            else servo_close_gate();
             HAL_UART_Transmit(&huart2, (uint8_t*)"FLAME:0\n", 8, 100);
           }
         }
@@ -203,10 +206,14 @@ int main(void)
       } else if (ch == '\n') {
         rx_buf[rx_idx] = '\0';
         if (rx_idx > 0) {
-          int count = 0, alarm = 0;
-          if (sscanf(rx_buf, "COUNT:%d,ALARM:%d", &count, &alarm) == 2) {
+          int lv = 0, buz = 0, servo = 0;
+          if (sscanf(rx_buf, "LV:%d,BUZ:%d,SERVO:%d", &lv, &buz, &servo) == 3) {
+            mqtt_lv = lv;
+            mqtt_servo = servo;
             if (!flame_alarm) {  /* 火焰报警优先级最高，不覆盖 */
-              set_outputs(alarm);
+              set_outputs(lv);
+              if (servo) servo_open_gate();
+              else servo_close_gate();
             }
           }
         }

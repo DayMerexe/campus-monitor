@@ -102,6 +102,37 @@
             outline: none;
         }
 
+        .channel-col.bound {
+            border-color: rgba(100,168,255,0.5);
+            box-shadow: 0 0 16px rgba(100,168,255,0.15), 0 4px 24px rgba(0,0,0,0.2);
+        }
+        .channel-col.bound .channel-header {
+            background: rgba(100,168,255,0.06);
+        }
+        .channel-col.bound .ch-name::after {
+            content: ' ← STM32';
+            font-size: 9px; font-weight: 500; color: var(--blue);
+            margin-left: 6px;
+            background: rgba(100,168,255,0.12);
+            padding: 1px 6px; border-radius: 4px;
+        }
+        .btn-bind {
+            padding: 5px 12px; border-radius: 6px;
+            border: 1px solid var(--glass-border);
+            background: rgba(0,0,0,0.15);
+            font-family: inherit; font-weight: 500;
+            cursor: pointer; font-size: 11px;
+            transition: all 0.15s;
+            color: var(--text-secondary);
+        }
+        .btn-bind:hover { background: var(--glass-hover); color: var(--text-primary); }
+        .btn-bind.active {
+            color: var(--blue);
+            border-color: rgba(100,168,255,0.3);
+            background: rgba(100,168,255,0.1);
+            box-shadow: 0 0 8px rgba(100,168,255,0.15);
+        }
+
         .channel-video {
             position: relative;
             aspect-ratio: 4/3;
@@ -310,6 +341,11 @@
     </div>
 
     <div class="control-bar">
+        <span style="font-size:11px;color:var(--text-secondary);">STM32绑定:</span>
+        <button class="btn-bind active" id="btnBindA" onclick="bindStm32('A')">出口A</button>
+        <button class="btn-bind" id="btnBindB" onclick="bindStm32('B')">出口B</button>
+        <button class="btn-bind" id="btnBindC" onclick="bindStm32('C')">出口C</button>
+        <div class="sep"></div>
         <span style="font-size:11px;color:var(--text-secondary);">火灾模拟:</span>
         <button class="btn btn-fire-on" id="btnFireB" onclick="fireSimulate('B')">🔥 出口B</button>
         <button class="btn btn-fire-on" id="btnFireC" onclick="fireSimulate('C')">🔥 出口C</button>
@@ -521,6 +557,20 @@
                 const fb = document.getElementById('flameBadge');
                 fb.style.display = anyFire ? 'inline-block' : 'none';
 
+                // ── STM32 绑定状态 ──────────────────
+                const binding = d.recommendation.stm32_binding || 'A';
+                CHANNELS.forEach((ch, i) => {
+                    const btn = document.getElementById('btnBind' + ch);
+                    const col = document.querySelectorAll('.channel-col')[i];
+                    if (ch === binding) {
+                        if (btn) btn.classList.add('active');
+                        if (col) col.classList.add('bound');
+                    } else {
+                        if (btn) btn.classList.remove('active');
+                        if (col) col.classList.remove('bound');
+                    }
+                });
+
                 // 推荐面板
                 const rec = d.recommendation;
                 const panel = document.getElementById('recPanel');
@@ -631,6 +681,33 @@
             btn.textContent = origText;
             btn.style.opacity = '1';
         });
+    }
+
+    // ── STM32 绑定切换 ────────────────────────────
+    function bindStm32(channel) {
+        // 先更新 UI（乐观更新）
+        CHANNELS.forEach(ch => {
+            const btn = document.getElementById('btnBind' + ch);
+            const col = document.querySelectorAll('.channel-col')[CHANNELS.indexOf(ch)];
+            if (ch === channel) {
+                btn.classList.add('active');
+                if (col) col.classList.add('bound');
+            } else {
+                btn.classList.remove('active');
+                if (col) col.classList.remove('bound');
+            }
+        });
+
+        fetch('/bind_stm32/' + channel, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        }).then(r => r.json()).then(d => {
+            if (d.status !== 'ok') {
+                // 失败回滚由下次 dashboard 轮询修正
+                console.warn('绑定失败:', d);
+            }
+        }).catch(() => {});
     }
 
     // ── 手动报警 ────────────────────────────────
