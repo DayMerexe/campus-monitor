@@ -34,10 +34,15 @@ alarm_event_id = None   # 当前报警事件 ID
 alarm_max_count = 0
 
 # 加载 YOLO 模型
-model = YOLO("yolov8n.pt")
-if torch.cuda.is_available():
-    model.to('cuda')
-print(f"✅ YOLOv8 模型已加载  (device: {model.device})")
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+model = YOLO("yolov8n.pt").to(device)
+print(f"YOLOv8n 已加载  device={model.device}")
+
+# CUDA warmup：触发 GPU kernel 编译，避免首帧卡顿 1.2s
+if device == 'cuda':
+    _dummy = np.random.randint(0, 255, (320, 240, 3), dtype=np.uint8)
+    model(_dummy, conf=0.5, verbose=False)
+    print(f"   GPU warmup 完成")
 
 
 def get_target_level(count):

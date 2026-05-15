@@ -5,8 +5,8 @@
 
 ## 当前状态
 _更新于 2026-05-15_
-- [硬件]: ESP32-CAM 固件帧率优化（quality 20→12, grab_mode→LATEST）详见 docs/PROGRESS.md
-- [后端]: 连接池耗尽修复 + 对称防抖 + MQTT按需发送 (commit `913bf87`)
+- [硬件]: ESP32-CAM 固件帧率优化（WiFi PS + quality 8 + Nagle关闭）(commit `0cc438d`)
+- [后端]: /video_feed连接去重 + stop_event退出 + ESP8266无限重连+指数退避
 - [前端]: 轮询合并为 /dashboard，连接数减半
 
 ## 运行命令
@@ -36,7 +36,7 @@ _更新于 2026-05-15_
 - 帧率优化 → 子对话处理，见 `docs/ESP32-CAM帧率问题.md`
 
 ## 已知问题
-- [ ] /video_feed 浏览器重连导致连接池泄漏，运行中 HTTP 请求卡死
+（暂无）
 
 ## 技术栈
 Python: Flask, PyTorch, YOLOv8, OpenCV, paho-mqtt | Arduino: ESP8266WiFi, PubSubClient | STM32: HAL UART/GPIO, TIM3 PWM | 前端: Chart.js, 原生 JS

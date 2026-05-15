@@ -21,7 +21,53 @@
 
 **结论：ESP32 固件不是主瓶颈，YOLO 推理才是。但固件有优化空间。**
 
-**[新发现 2026-05-15]** 直接访问 ESP32 `/stream` 原始流也只有 ~5fps，排除 Python/YOLO 干扰后瓶颈确实在固件端。CSDN 文章交叉验证发现缺失项：① `esp_wifi_set_ps(WIFI_PS_NONE)` 未调用（仅 `WiFi.setSleep(false)` 不够）；② `stream_handler` 每帧 3 次 `httpd_resp_send_chunk` 触发 Nagle 合并延迟；③ `CONFIG_ESP_FACE_DETECT_ENABLED=1` 人脸检测代码编译进去了（PSRAM 板自动启用）。另外 Python `generate_frames()` 硬限 200ms(5fps) 即使固件跑满也突破不了。
+**[新发现 2026-05-15]** 直接访问 ESP32 `/stream` 原始流也只有 ~5fps，排除 Python/YOLO 干扰后瓶颈确实在固件端。（固件优化已于 #4 合并。）
+
+---
+
+## [新任务] YOLO 推理帧率优化
+
+### 当前状态
+
+`detector.py:52-213` `detect_loop()`，主循环每帧做：MJPEG 解析 → YOLOv8n 推理（320×240, CPU, 80-200ms）→ 防抖判断 → 画框 → DB 写入 → MQTT 广播。
+
+`detector.py:216` `generate_frames()` 已改为 20fps 上限（50ms 间隔）。
+
+### 可优化方向（子对话调研选最优路径）
+
+1. **模型加速**：ONNX Runtime / OpenVINO 导出 yolov8n，CPU 推理有望从 80-200ms 降至 30-60ms
+2. **推理分辨率**：320×240 → 256×192 或 224×224，像素数减半，精度损失待评估
+3. **跳帧策略**：不每帧推理，隔 1-2 帧跑一次 YOLO，中间帧复用上次结果（或用轻量运动检测决定是否跑）
+4. **推理线程分离**：MJPEG 采集在主线程，YOLO 推理在独立线程/进程，采集不阻塞推理、推理不阻塞采集
+5. **TensorRT**：如果有 NVIDIA GPU，FP16 推理可到 5-10ms
+
+### 领地边界（不能改的部分）
+
+以下属于数据传输对话领域，YOLO 优化时 **读但不改**：
+
+- `detector.py:124-162` 三级报警防抖逻辑
+- `detector.py:139-157` DB 写入（`start_alarm`/`end_alarm`/`insert_detection`）
+- `detector.py:186-190` MQTT 广播（`broadcast()`）
+- `detector.py:28-30` 报警阈值变量
+
+### 涉及文件
+
+| 文件 | 用途 |
+|------|------|
+| `campus_monitor/detector.py` | `detect_loop()` 第 52-213 行，YOLO 推理 + 前后处理 |
+| `campus_monitor/detector.py` | 第 36-40 行模型加载（可改 backend） |
+
+### 测试方法
+
+```bash
+cd F:\bishe\campus_monitor
+/c/Users/DayMer/miniconda3/python.exe -c "
+from detector import model, detect_loop
+# 跑 100 帧测平均推理时间
+"
+```
+
+验收标准：YOLO 推理环节从 80-200ms/帧 降至 50ms/帧以下，端到端帧率稳定在 12fps 以上。
 
 ---
 
@@ -91,7 +137,8 @@ _子对话在此更新，一项完成追加一行_
 | 日期 | 做了什么 | 产出 |
 |------|---------|------|
 | 2026-05-15 | **[新发现]** 直接访问 ESP32 `/stream` 仅 ~5fps，瓶颈在固件非 YOLO；定位 WiFi PS 缺失 + Nagle 延迟 + 人脸检测编译 | 入口文档分析 |
-| 2026-05-15 | 交付 3 个 `_fixed`：固件 WiFi PS + 质量调优、app_httpd 流处理器大改、Python 采集+输出帧率 | `CameraWebServer_fixed.ino`、`app_httpd_fixed.cpp`、`detector_fixed.py` |
+| 2026-05-15 | 固件轮交付 3 个 `_fixed`：WiFi PS + 质量调优、app_httpd 流处理器大改、Python 采集+输出帧率 | `CameraWebServer_fixed.ino`、`app_httpd_fixed.cpp`、`detector_fixed.py` |
+| 2026-05-15 | YOLO 轮：GPU 推理实测 10ms 确认非瓶颈；CUDA warmup + 显式设备选择防止首帧卡顿 | `detector_fixed.py` (YOLO优化轮) |
 
 ---
 
@@ -107,3 +154,4 @@ _主对话合并时对照此表_
 | ~~B~~ | ~~`detector_fixed_cam.py`~~ | 移交给数据传输对话（mDNS / stop_event） | — | stop_event 已整合，mDNS 待补 |
 | ~~C~~ | ~~`app_fixed.py`~~ | 移交给数据传输对话（/video_feed 连接去重） | — | ✅ 已合并 |
 | — | mDNS #3a | ESP32 固件 ESPmDNS 广播 | — | 待补 |
+| 4 | `detector_fixed.py` | CUDA warmup + 显式设备选择 | ✓ py_compile | ✅ 已合并 |
