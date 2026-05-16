@@ -172,20 +172,24 @@ def manual_control():
         action = data['action']
         if action == 'alarm_on':
             detector.manual_alarm_active = True
-            broadcast("COUNT:0,ALARM:2\n")
-            return jsonify({'status': 'ok', 'action': 'alarm_on'})
+            print("⚠️ [手动报警] 已触发")
         elif action == 'alarm_off':
             detector.manual_alarm_active = False
-            broadcast("COUNT:0,ALARM:0\n")
-            return jsonify({'status': 'ok', 'action': 'alarm_off'})
+            print("✅ [手动报警] 已解除")
+        else:
+            return jsonify({'status': 'error'}), 400
+        detector.coordinated_decision()
+        return jsonify({'status': 'ok', 'action': action})
     return jsonify({'status': 'error'}), 400
 
 
 @app.route('/fire_simulate/<channel>', methods=['POST'])
 def fire_simulate(channel):
-    """火灾模拟：为通道 B/C 设置虚拟火焰状态（通道 A 由实物传感器控制）"""
-    if channel not in ('B', 'C'):
-        return jsonify({'status': 'error', 'message': '仅通道 B/C 支持火灾模拟'}), 400
+    """火灾模拟：为非绑定通道设置虚拟火焰（绑定通道由物理传感器接管）"""
+    if channel not in detector.CHANNELS:
+        return jsonify({'status': 'error', 'message': 'invalid channel'}), 400
+    if channel == detector.stm32_binding:
+        return jsonify({'status': 'error', 'message': f'通道 {channel} 由物理火焰传感器控制，不支持模拟'}), 400
 
     data = request.get_json()
     if data and 'action' in data:

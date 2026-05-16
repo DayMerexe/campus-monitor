@@ -440,8 +440,9 @@
         <button class="btn-bind" id="btnBindC" onclick="bindStm32('C')">出口C</button>
         <div class="sep"></div>
         <span style="font-size:11px;color:var(--text-secondary);">火灾模拟:</span>
-        <button class="btn btn-fire-on" id="btnFireB" onclick="fireSimulate('B')">🔥 出口B</button>
-        <button class="btn btn-fire-on" id="btnFireC" onclick="fireSimulate('C')">🔥 出口C</button>
+        <button class="btn btn-fire-on" id="btnFireA" onclick="fireSimulate('A')" style="display:none;">🔥 出口A</button>
+        <button class="btn btn-fire-on" id="btnFireB" onclick="fireSimulate('B')" style="display:none;">🔥 出口B</button>
+        <button class="btn btn-fire-on" id="btnFireC" onclick="fireSimulate('C')" style="display:none;">🔥 出口C</button>
         <div class="sep"></div>
         <button class="btn btn-alarm-on" onclick="manualAlarm('alarm_on')">⚠️ 手动报警</button>
         <button class="btn btn-alarm-off" onclick="manualAlarm('alarm_off')">解除</button>
@@ -465,7 +466,7 @@
     const CH_NAMES = { 'A': '出口 A（正门）', 'B': '出口 B（侧门）', 'C': '出口 C（后门）' };
     const CH_DESCS = { 'A': '视频监测流', 'B': '视频监测流', 'C': '视频监测流' };
 
-    let fireState = { B: false, C: false };
+    let fireState = { A: false, B: false, C: false };
     let videoFiles = [];
     let chartCollapsed = false;
     let isEmergency = false;
@@ -634,6 +635,8 @@
                         fireInd.style.display = 'none';
                         fireIndLbl.style.display = 'none';
                     }
+                    // 同步模拟按钮状态（非绑定通道用）
+                    fireState[ch] = cd.fire;
 
                     // 监测按钮状态
                     const monBtn = document.getElementById('btnMon' + ch);
@@ -698,12 +701,15 @@
                 CHANNELS.forEach((ch, i) => {
                     const btn = document.getElementById('btnBind' + ch);
                     const col = document.querySelectorAll('.channel-col')[i];
+                    const fireBtn = document.getElementById('btnFire' + ch);
                     if (ch === binding) {
                         if (btn) btn.classList.add('active');
                         if (col) col.classList.add('bound');
+                        if (fireBtn) fireBtn.style.display = 'none';
                     } else {
                         if (btn) btn.classList.remove('active');
                         if (col) col.classList.remove('bound');
+                        if (fireBtn) fireBtn.style.display = '';
                     }
                 });
 
@@ -867,7 +873,7 @@
             if (d.status === 'ok') {
                 fireState[channel] = d.fire;
                 if (d.fire) {
-                    btn.textContent = '🔥 ' + CH_NAMES[channel] + ' 燃烧中';
+                    btn.textContent = '🔥 出口' + channel + ' 燃烧中';
                     btn.classList.add('active');
                 } else {
                     btn.textContent = '🔥 出口' + channel;
