@@ -304,24 +304,26 @@ def _open_source(channel):
         files = list_video_files()
         with _active_video_lock:
             used = {p for ch, p in _active_video_path.items() if ch != channel}
-            # 选出候选文件
+            # 选出候选文件（每通道优先匹配自己的前缀）
             chosen = None
+            ch_lower = channel.lower()
             for f in files:
                 candidate = os.path.join(VIDEOS_DIR, f)
                 if candidate in used:
                     continue
-                if channel == 'A' and f.startswith('channel_a'):
-                    chosen = candidate
-                    break
-                elif channel in ('B', 'C') and not f.startswith('channel_a'):
+                if f.lower().startswith('channel_' + ch_lower):
                     chosen = candidate
                     break
             if not chosen:
+                # 未匹配到专属文件，选任意未被占用的
                 for f in files:
                     candidate = os.path.join(VIDEOS_DIR, f)
-                    if candidate not in used:
-                        chosen = candidate
-                        break
+                    if candidate in used:
+                        continue
+                    if channel == 'A' and not f.startswith('channel_a'):
+                        continue
+                    chosen = candidate
+                    break
 
             if chosen:
                 cap = cv2.VideoCapture(chosen)
@@ -422,7 +424,9 @@ def detect_loop(channel):
                 with _active_video_lock:
                     _active_video_path.pop(channel, None)
                 source = None
-            time.sleep(0.1)
+                time.sleep(0.8)  # 避免短视频快速 reopen 循环
+            else:
+                time.sleep(0.1)
             continue
 
         # ── YOLO 推理 ─────────────────────────────

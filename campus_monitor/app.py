@@ -73,6 +73,7 @@ def dashboard():
         with detector.channel_locks[ch]:
             s = detector.channel_state[ch]
             fire = tcp_server.flame_active if ch == 'A' else s['fire']
+            vpath = detector._active_video_path.get(ch)
             channels_data[ch] = {
                 'active': detector.channel_active.get(ch, False),
                 'count': s['count'],
@@ -82,6 +83,7 @@ def dashboard():
                 'fire': fire,
                 'threshold_red': s['threshold_red'],
                 'threshold_warn': s['threshold_warn'],
+                'active_source': os.path.basename(vpath) if vpath else None,
             }
 
     stats = get_today_stats()
@@ -235,8 +237,24 @@ def toggle_monitoring(channel):
         return jsonify({'status': 'error', 'message': 'invalid channel'}), 400
     data = request.get_json()
     if data and 'active' in data:
+        activating = bool(data['active'])
+        if activating:
+            # 检查该通道当前占用的文件是否被其他活动通道使用
+            my_path = detector._active_video_path.get(channel)
+            if my_path:
+                for other_ch in detector.CHANNELS:
+                    if other_ch == channel:
+                        continue
+                    if not detector.channel_active.get(other_ch, False):
+                        continue
+                    other_path = detector._active_video_path.get(other_ch)
+                    if other_path and os.path.normpath(other_path) == os.path.normpath(my_path):
+                        return jsonify({
+                            'status': 'error',
+                            'message': f'该视频正被出口{other_ch}使用，请切换其他视频源后再启动'
+                        }), 409
         with detector.channel_active_lock:
-            detector.channel_active[channel] = bool(data['active'])
+            detector.channel_active[channel] = activating
         state = '启动' if detector.channel_active[channel] else '暂停'
         print(f"[通道 {channel}] 监测{state}")
         return jsonify({'status': 'ok', 'channel': channel, 'active': detector.channel_active[channel]})

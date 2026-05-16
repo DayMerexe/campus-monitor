@@ -511,6 +511,7 @@
                     <select id="srcSel${ch}" onchange="changeSource('${ch}')" style="flex:1;min-width:0;">
                         ${srcOpts}
                     </select>
+                    <span id="srcHint${ch}" style="font-size:9px;color:var(--amber);display:none;flex-shrink:0;">⏸暂停切换</span>
                     <button class="btn" onclick="replayVideo('${ch}')" style="font-size:10px;padding:3px 8px;flex-shrink:0;" title="重新播放">↻</button>
                 </div>
                 <div class="channel-video">
@@ -652,6 +653,34 @@
                     const inputEl = document.getElementById('thRed' + ch);
                     if (inputEl && document.activeElement !== inputEl) {
                         inputEl.value = cd.threshold_red;
+                    }
+
+                    // ── 下拉选项：灰化被占用文件 + 监测中禁用 ──
+                    const sel = document.getElementById('srcSel' + ch);
+                    const hint = document.getElementById('srcHint' + ch);
+                    if (sel) {
+                        for (let i = 0; i < sel.options.length; i++) {
+                            const opt = sel.options[i];
+                            const val = opt.value;
+                            if (val.startsWith('mp4:')) {
+                                const fname = val.substring(4);
+                                let occupiedBy = null;
+                                CHANNELS.forEach(other => {
+                                    if (other !== ch && d.channels[other].active_source === fname) {
+                                        occupiedBy = other;
+                                    }
+                                });
+                                if (occupiedBy) {
+                                    opt.disabled = true;
+                                    opt.textContent = fname + ' (出口' + occupiedBy + ' 占用)';
+                                } else {
+                                    opt.disabled = false;
+                                    opt.textContent = fname;
+                                }
+                            }
+                        }
+                        sel.disabled = cd.active;
+                        if (hint) hint.style.display = cd.active ? 'inline' : 'none';
                     }
                 });
 
@@ -865,6 +894,17 @@
         const btn = document.getElementById('btnMon' + channel);
         const isActive = btn.textContent === '⏸';
         const newActive = !isActive;
+        const origText = btn.textContent;
+
+        // 启动前 UI 预检：下拉是否选了被占用的文件
+        if (newActive) {
+            const sel = document.getElementById('srcSel' + channel);
+            if (sel && sel.options[sel.selectedIndex] && sel.options[sel.selectedIndex].disabled) {
+                alert(sel.options[sel.selectedIndex].textContent + '，请选择其他视频');
+                return;
+            }
+        }
+
         btn.textContent = '...';
         btn.style.opacity = '0.5';
         fetch('/monitoring/toggle/' + channel, {
@@ -875,8 +915,19 @@
             btn.style.opacity = '1';
             if (d.status === 'ok') {
                 updateMonButton(btn, d.active);
+                if (d.active) {
+                    const img = document.getElementById('video' + channel);
+                    img.src = '/video_feed/' + channel + '?t=' + Date.now();
+                }
+            } else {
+                alert(d.message || '操作失败');
+                btn.textContent = origText;
             }
-        }).catch(() => { btn.style.opacity = '1'; });
+        }).catch(() => {
+            btn.style.opacity = '1';
+            btn.textContent = origText;
+            alert('请求失败，请重试');
+        });
     }
 
     function updateMonButton(btn, active) {
