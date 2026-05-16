@@ -440,7 +440,7 @@ def detect_loop(channel):
 
                 if target > 0 and old_level == 0:
                     try:
-                        st['alarm_event_id'] = start_alarm(count, target)
+                        st['alarm_event_id'] = start_alarm(count, target, channel)
                     except Exception as e:
                         print(f"⚠️ DB 写入失败: {e}")
                     st['alarm_max_count'] = count

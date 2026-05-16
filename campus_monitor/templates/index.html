@@ -445,17 +445,29 @@
 
     // ── Chart.js ────────────────────────────────
     const ctx = document.getElementById('trendChart').getContext('2d');
+    const CHART_COLORS = {
+        A: { border: '#64a8ff', bg: 'rgba(100,168,255,0.08)' },
+        B: { border: '#5ddb8f', bg: 'rgba(93,219,143,0.08)' },
+        C: { border: '#f5b64c', bg: 'rgba(245,182,76,0.08)' },
+    };
     const chart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: [],
             datasets: [
-                { label: '总人数', data: [], borderColor: '#64a8ff', backgroundColor: 'rgba(100,168,255,0.08)', fill: true, tension: 0.3, pointRadius: 1, borderWidth: 2 },
+                { label: '出口A', data: [], borderColor: CHART_COLORS.A.border, backgroundColor: CHART_COLORS.A.bg, fill: false, tension: 0.3, pointRadius: 0, borderWidth: 2 },
+                { label: '出口B', data: [], borderColor: CHART_COLORS.B.border, backgroundColor: CHART_COLORS.B.bg, fill: false, tension: 0.3, pointRadius: 0, borderWidth: 2 },
+                { label: '出口C', data: [], borderColor: CHART_COLORS.C.border, backgroundColor: CHART_COLORS.C.bg, fill: false, tension: 0.3, pointRadius: 0, borderWidth: 2 },
             ]
         },
         options: {
-            responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
-            plugins: { legend: { display: false } },
+            responsive: true, maintainAspectRatio: false, animation: { duration: 200 },
+            plugins: {
+                legend: {
+                    display: true,
+                    labels: { color: 'rgba(255,255,255,0.6)', font: { size: 10 }, boxWidth: 12, padding: 8 }
+                }
+            },
             scales: {
                 x: { ticks: { color: 'rgba(255,255,255,0.3)', maxTicksLimit: 5, font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
                 y: { beginAtZero: true, ticks: { color: 'rgba(255,255,255,0.3)', stepSize: 1, font: { size: 9 } }, grid: { color: 'rgba(255,255,255,0.04)' } }
@@ -545,7 +557,8 @@
                     }
                 });
 
-                document.getElementById('fpsDisplay').textContent = 'FPS: ' + (totalFps / 3).toFixed(1);
+                const activeChannels = CHANNELS.filter(ch => d.channels[ch].active).length || 1;
+                document.getElementById('fpsDisplay').textContent = 'FPS: ' + (totalFps / activeChannels).toFixed(1);
 
                 // STM32
                 const stm = document.getElementById('stm32Status');
@@ -611,13 +624,17 @@
                     recDetail.textContent = '所有出口流量正常，无需干预';
                 }
 
-                // 折线图
-                const rows = d.history;
-                chart.data.labels = rows.map(r => {
-                    const t = r.timestamp.split('T')[1];
-                    return t ? t.substring(0, 5) : '';
-                });
-                chart.data.datasets[0].data = rows.map(r => r.count);
+                // 折线图（分通道历史）
+                const chHist = d.channel_history;
+                if (chHist && chHist.A) {
+                    chart.data.labels = chHist.A.map(r => {
+                        const t = r.timestamp.split('T')[1];
+                        return t ? t.substring(0, 5) : '';
+                    });
+                    chart.data.datasets[0].data = chHist.A.map(r => r.count);
+                    chart.data.datasets[1].data = chHist.B ? chHist.B.map(r => r.count) : [];
+                    chart.data.datasets[2].data = chHist.C ? chHist.C.map(r => r.count) : [];
+                }
                 chart.update('none');
 
                 // 报警历史
@@ -626,14 +643,16 @@
                 if (!alarmRows.length) {
                     wrap.innerHTML = '<div class="empty-hint">暂无报警记录</div>';
                 } else {
-                    let html = '<table class="alarm-table"><tr><th>开始</th><th>结束</th><th>峰值</th><th>时长</th></tr>';
+                    let html = '<table class="alarm-table"><tr><th>通道</th><th>等级</th><th>开始</th><th>结束</th><th>峰值</th><th>时长</th></tr>';
                     alarmRows.forEach(r => {
+                        const ch = r.channel || 'A';
+                        const lv = r.level === 2 ? '🔴' : '🟡';
                         const start = (r.start_time.split('T')[1] || r.start_time).substring(0, 8);
                         const end = r.end_time
                             ? (r.end_time.split('T')[1] || r.end_time).substring(0, 8)
                             : '<span class="ongoing">进行中</span>';
                         const dur = r.duration != null ? r.duration + 's' : '-';
-                        html += `<tr><td>${start}</td><td>${end}</td><td>${r.max_count}</td><td>${dur}</td></tr>`;
+                        html += `<tr><td>出口${ch}</td><td>${lv}</td><td>${start}</td><td>${end}</td><td>${r.max_count}</td><td>${dur}</td></tr>`;
                     });
                     html += '</table>';
                     wrap.innerHTML = html;

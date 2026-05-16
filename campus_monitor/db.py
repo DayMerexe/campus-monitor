@@ -32,7 +32,8 @@ def init_db():
                 end_time   TEXT,
                 max_count  INTEGER NOT NULL DEFAULT 0,
                 level      INTEGER NOT NULL DEFAULT 1,
-                duration   REAL
+                duration   REAL,
+                channel    TEXT    NOT NULL DEFAULT 'A'
             );
         ''')
         cols = [row[1] for row in conn.execute('PRAGMA table_info(detection_records)').fetchall()]
@@ -43,6 +44,9 @@ def init_db():
         if 'level' not in cols:
             conn.execute('ALTER TABLE alarm_events ADD COLUMN level INTEGER NOT NULL DEFAULT 1')
             print("✅ 数据库迁移: alarm_events 已添加 level 列")
+        if 'channel' not in cols:
+            conn.execute('ALTER TABLE alarm_events ADD COLUMN channel TEXT NOT NULL DEFAULT \'A\'')
+            print("✅ 数据库迁移: alarm_events 已添加 channel 列")
 
 
 def insert_detection(count, alarm, fps, channel='A'):
@@ -53,11 +57,11 @@ def insert_detection(count, alarm, fps, channel='A'):
         )
 
 
-def start_alarm(max_count, level=1):
+def start_alarm(max_count, level=1, channel='A'):
     with get_conn() as conn:
         cur = conn.execute(
-            'INSERT INTO alarm_events (start_time, max_count, level) VALUES (?, ?, ?)',
-            (datetime.now().isoformat(), max_count, level)
+            'INSERT INTO alarm_events (start_time, max_count, level, channel) VALUES (?, ?, ?, ?)',
+            (datetime.now().isoformat(), max_count, level, channel)
         )
         return cur.lastrowid
 
@@ -95,10 +99,23 @@ def get_recent_records(limit=20, channel=None):
 def get_alarm_events(limit=50):
     with get_conn() as conn:
         rows = conn.execute(
-            'SELECT start_time, end_time, max_count, duration FROM alarm_events ORDER BY id DESC LIMIT ?',
+            'SELECT start_time, end_time, max_count, duration, level, channel FROM alarm_events ORDER BY id DESC LIMIT ?',
             (limit,)
         ).fetchall()
         return [dict(r) for r in reversed(rows)]
+
+
+def get_channel_history(limit_per_channel=20):
+    """返回每通道最近 N 条检测记录，用于分通道折线图"""
+    result = {}
+    for ch in ['A', 'B', 'C']:
+        with get_conn() as conn:
+            rows = conn.execute(
+                'SELECT timestamp, count, alarm, fps FROM detection_records WHERE channel = ? ORDER BY id DESC LIMIT ?',
+                (ch, limit_per_channel)
+            ).fetchall()
+            result[ch] = [dict(r) for r in reversed(rows)]
+    return result
 
 
 def get_today_stats(channel=None):

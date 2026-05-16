@@ -6,7 +6,7 @@ import time
 import os
 from flask import Flask, render_template, Response, jsonify, request
 
-from db import init_db, get_recent_records, get_alarm_events, get_today_stats
+from db import init_db, get_recent_records, get_alarm_events, get_today_stats, get_channel_history
 import detector
 from tcp_server import tcp_server, broadcast, mqtt_init
 import tcp_server
@@ -85,7 +85,7 @@ def dashboard():
             }
 
     stats = get_today_stats()
-    history_rows = get_recent_records(20)
+    channel_history = get_channel_history(20)
     alarm_rows = get_alarm_events(50)
 
     return jsonify({
@@ -102,7 +102,7 @@ def dashboard():
             'peak_count': stats['peak_count'],
             'stm32_online': tcp_server.stm32_connected,
         },
-        'history': history_rows,
+        'channel_history': channel_history,
         'alarms': alarm_rows,
     })
 
@@ -244,7 +244,7 @@ def toggle_monitoring(channel):
 
 @app.route('/history')
 def history():
-    rows = get_recent_records(20)
+    rows = get_channel_history(20)
     return jsonify(rows)
 
 
