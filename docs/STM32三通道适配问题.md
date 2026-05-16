@@ -186,6 +186,17 @@ _子对话在此更新，一项完成追加一行_
 | 2026-05-16 | v4 演示优化：视频共用卡死修复（B/C分片）、EOF close+reopen、监测总开关（默认暂停）、手动重播按钮、默认阈值→20、蜂鸣器舵机临时静音 | 4 个 _fixed，已合并 → 7b7dcf4 |
 | 2026-05-16 | v4.1 bugfix：mjpeg→mp4 回退 + /replay API + 阈值框 52px | 已合并 → 940cb54 |
 | 2026-05-16 | v5 仪表盘修复：折线图分通道（3条线）+ 报警表格加通道/等级列 + alarm_events 加 channel 迁移 + get_channel_history | 已合并 → 2992023 |
+| 2026-05-16 | v5.1 bugfix：_open_source 竞态修复（文件选择+追踪原子化）、STM32 绿标发光效果、移除顶栏 FPS | 已合并 → bab6989 |
+
+---
+
+## 流程规则
+
+**每次代码修改完成后，必须更新本入口文档的"协作进度"段落和"产出清单"状态。** 这是强制最后一步，不可省略。主对话依赖这些记录来审查 diff、跟踪进度、协调多子对话。
+
+**Why:** 多次遗忘同步导致主对话无法及时了解子对话产出，造成合并延迟和重复工作。
+
+**How to apply:** 代码改动 → 语法检查 → 更新入口文档 → 报告用户。少一步不算完。
 
 ---
 
@@ -193,9 +204,9 @@ _子对话在此更新，一项完成追加一行_
 
 | # | _fixed 文件 | 对应功能 | 自测 | 状态 |
 |---|-----------|---------|------|------|
-| 1 | `detector_fixed.py` | 绑定逻辑 + MQTT 短指令 + 监测开关 + 视频分片 + 阈值默认值 + mjpeg回退+replay强制重开 | ✓ py_compile | 已合并 |
-| 2 | `app_fixed.py` | /bind_stm32 + /get_binding + /monitoring/toggle + /replay + dashboard | ✓ py_compile | 已合并 |
-| 3 | `index_fixed.html` | 绑定按钮组 + 监测 ▶/⏸ + 重播 ↻ + 蓝色高亮边框 + 阈值框52px | ✓ | 已合并 |
+| 1 | `detector_fixed.py` | 绑定+短指令+监测开关+视频分片+mjpeg回退+replay+竞态原子化 | ✓ py_compile | 已合并 |
+| 2 | `app_fixed.py` | /bind_stm32 + /get_binding + /monitoring/toggle + /replay + dashboard + since | ✓ py_compile | 已合并 |
+| 3 | `index_fixed.html` | 绑定按钮+监测▶/⏸+重播↻+阈值52px+STM32绿标发光-顶栏FPS+since | ✓ | 已合并 |
 | 4 | `main_fixed.c` → main.c | LV:BUZ:SERVO 解析 + MQTT 舵机 + 火焰恢复 MQTT 状态 + 蜂鸣器舵机静音 | — | 已合并 |
 
 自测：✓=通过 / ✗=有问题 / —=未开始。状态流转：`待产出` → `待审查` → `已合并`
