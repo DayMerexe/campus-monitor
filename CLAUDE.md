@@ -4,11 +4,11 @@
 毕设：应急场景下的校园人流量监控管理系统。双输入：ESP32-CAM + YOLOv8（远程AI）和火焰传感器（本地应急）。
 
 ## 当前状态
-_更新于 2026-05-16_
-- [后端]: v6 视频源统一 + v6.1~v6.7 性能优化（15→20fps + 相位错开 + EOF seek + broadcast 锁外）→ 外围瓶颈已消除
-- [前端]: 三通道统一下拉（MJPEG+MP4）+ 应急双态仪表盘 + 下拉灰化占用标记
-- [硬件]: 舵机/蜂鸣器已恢复 → 待烧录测试
-- [AI]: YOLOv8n 漏检严重 + 推理时间随人数增长 → 新对话自训练（见 `docs/YOLO模型自训练.md`）
+_更新于 2026-05-17_
+- [软件]: v7 火焰传感器去硬编码 + 手动报警修复 + 火焰按钮动态化 → 软件功能完整
+- [AI]: YOLO 训练脚本就绪（train.py + merge_datasets.py），数据集已合并 → 待跑
+- [硬件]: main.c 已恢复舵机/蜂鸣器 → 待烧录联调
+- [论文]: 旧版作废，以三通道系统重写第1-4章，工具链已就绪
 
 ## 运行命令
 `cd F:\bishe\campus_monitor && /c/Users/DayMer/miniconda3/python.exe app.py` → http://localhost:5000
@@ -36,7 +36,7 @@ _更新于 2026-05-16_
 - [ ] 硬件实物联调（烧录 main.c + ESP8266）
 - [ ] YOLO 模型自训练（新子对话）
 - [ ] 终期答辩 PPT + 演示流程
-- [ ] 论文第3-4章
+- [ ] 论文第1-4章（旧版1-2章作废，需以三通道系统重写）
 
 ## 已知问题
 - mDNS 未实现（detector.py + ESP32 固件），IP 变化时需手动改代码
@@ -46,6 +46,8 @@ Python: Flask, PyTorch, YOLOv8, OpenCV, paho-mqtt | Arduino: ESP8266WiFi, PubSub
 
 ## 论文写作
 _入口：新论文对话启动时读本节 + `docs/writing.md`_
+
+> ⚠️ **旧版第1-2章作废**：之前生成的 `论文草稿_第1-2章.docx` 基于旧单通道系统。当前已升级为三通道联动+多出口疏散，论文需以**当前版本**重新撰写。旧文件仅参考格式（docx 生成方式），内容不可复用。
 
 ### 工具链
 - npm `docx` 包生成 .docx，不用 python-docx
@@ -65,8 +67,8 @@ _入口：新论文对话启动时读本节 + `docs/writing.md`_
 - 三个 helper：`bodyPara(text)` 宋体小四+缩进、`h2(text)`/`h3(text)` 黑体加粗
 - 内容推入 `children[]` 数组，末位 `new Document({sections:[{children}]})` 打包
 - 输出路径：`F:/bishe/output/论文草稿_第X-Y章.docx`
-- 已生成：第1-2章（17.5 KB）— 可直接参考 gen_thesis.js 里的写法
-- 待生成：第3章（系统设计与实现）、第4章（系统测试与分析）
+- ~~已生成：第1-2章~~（旧版单通道，作废）
+- 待生成：第1-4章（以当前三通道联动系统为基础）
 
 ### 避坑
 - F: 盘 npm 偶发找不到本地模块，`output/` 内自建 package.json 解决

@@ -1,5 +1,58 @@
 # 进度日志
 
+## 2026-05-17 (#17) [配置] [AI]
+
+**做了什么：** CLAUDE.md 论文写作部分重构（npm docx 工具链 + 格式常量 + 避坑）+ YOLO 训练脚本就绪（merge_datasets.py + train.py）+ 系统功能终态确认
+
+**关键决策：**
+- 旧版第1-2章作废，论文以三通道联动系统重写
+- YOLO 训练三源混合：crowd-control（过滤>100人）+ AIxunlian（限2000张）+ 本地标注，统一 class=0
+- 系统软件侧功能完整，2755 行核心代码，15 个 API 路由
+
+**下一步：** 开始论文第1章 / YOLO 训练挂后台 / STM32 烧录测试
+
+---
+
+## 2026-05-16 (#16) [后端] [前端]
+
+**做了什么：**
+- v7 火焰传感器去硬编码：合并进 STM32 绑定，删除全局 OR，火焰模拟按钮动态化
+- v7.1 手动报警修复：`/control` 旧协议 `COUNT:0,ALARM:2` → 走 `coordinated_decision()` 发 `LV:BUZ:SERVO`，`manual_alarm_active` 参与 lv 计算（与火灾同级 lv=2）
+
+**关键决策：**
+- `manual_alarm_active` 之前是僵尸变量——设了值但无人读取，广播用的是 STM32 已不认的旧协议
+- 改为在 `coordinated_decision()` 中 `lv = 2 if (bound_fire or manual_alarm_active) else bound_alarm`
+
+**关键决策：**
+- 之前顾虑"控制舵机"和"传感器归属"混一起，但实际中 STM32 部署在哪个出口就管那个出口的硬件，合在一起更合理
+- 火焰模拟按钮冲突修复：绑定通道同时存在物理传感器 + 模拟按钮 → 状态冲突白屏 → 改为动态显隐
+
+**涉及文件：** `detector.py`, `app.py`, `notify.py`, `index.html` + 全部 `_fixed` 副本
+
+**下一步：** 主对话审查合并（火焰按钮部分）
+
+## 2026-05-16 (#16) [后端] (已合并 cfb58e4)
+
+## 2026-05-16 (#15) [后端]
+
+**做了什么：** v6.7 性能优化：detect_loop 加相位错开（A/B/C 各差 ~16.7ms，避免三路 YOLO 同时抢 GPU）+ 帧率上限 15→20fps（detect_loop + generate_frames 同步）+ 新增 2 个 MP4 测试视频（a_hallway.mp4 / b_hallway.mp4，640×480）
+
+**关键决策：**
+- v6.6 只给 generate_frames 加了相位，但 detect_loop 三路 YOLO 仍然同时启动→抢 GPU/GIL→C 通道饿死，卡顿依旧
+- v6.7 在 detect_loop 启动后立即 sleep 相位差再进入主循环，从源头错开 YOLO 推理
+
+**涉及文件：** `detector_fixed.py`
+
+**发现：**
+- 密集人群（7~9人）通道明显比稀疏（3~4人）通道卡顿 — YOLO 推理时间与检测框数量正相关
+- 默认 YOLOv8n 对新视频漏检严重（校园监控视角 + 密集人群），需要自训练
+
+**下一步：** 新对话 — YOLO 模型自训练（提升检测精度 + 可能换 s/m 模型权衡速度）
+
+---
+
+## 2026-05-16 (#15) [后端] (续)
+
 ## 2026-05-16 (#14) [后端] [前端]
 
 **做了什么：** MJPEG/MP4 视频源统一重构：三通道默认 MP4（不再特殊化 A），MJPEG 不可达显示"摄像头未连接"不回退，B/C 也可选 MJPEG（多摄像头扩展），source_config 加 url 字段，_read_frame 改用 isinstance
