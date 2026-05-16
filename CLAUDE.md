@@ -4,11 +4,10 @@
 毕设：应急场景下的校园人流量监控管理系统。双输入：ESP32-CAM + YOLOv8（远程AI）和火焰传感器（本地应急）。
 
 ## 当前状态
-_更新于 2026-05-15_
-- [硬件]: 固件 v5 合并（30MHz XCLK + QVGA 320×240），OV2640 未损坏，原始流实测 20+fps
-- [配置]: 后续计划已制定：8 任务 4 阶段（多场景模拟→手机推送→硬件联调→论文答辩）
-- [后端]: /video_feed连接去重 + stop_event + ESP8266无限重连，mDNS 待补
-- [帧率]: ESP32-CAM 帧率问题已解决，根因是 20MHz XCLK 下 OV2640 PLL 无法正确锁频，30MHz+QVGA 是唯一可行组合
+_更新于 2026-05-16_
+- [后端]: v3~v5 全部合并 — STM32 绑定+MQTT短指令、演示优化（监测开关/视频分片）、仪表盘分通道折线图+报警表格通道标签
+- [前端]: 三通道独立阈值+视频源切换+STM32 绑定按钮+重播按钮+监测 ▶/⏸
+- [硬件]: 固件 30MHz+QVGA 稳定，舵机/蜂鸣器临时静音（演示前恢复）
 
 ## 运行命令
 `cd F:\bishe\campus_monitor && /c/Users/DayMer/miniconda3/python.exe app.py` → http://localhost:5000
@@ -18,7 +17,7 @@ _更新于 2026-05-15_
 
 ## 协作流程
 - **主对话**：架构决策 + diff 审查 + 合并执行 + 进度管理
-- **子对话**：帧率优化 / 数据传输修复，产出 `_fixed` 完整副本
+- **子对话**：帧率优化 / 数据传输修复（产出 `_fixed`）/ 论文写作（内容生成，非代码）
 - 子对话读入口文档获取上下文，完成后更新"协作进度"段落
 - 合并流程 & 启动模板详见 `docs/协作流程.md`
 
@@ -28,16 +27,43 @@ _更新于 2026-05-15_
 - 三级报警+火焰防抖，详见 docs/architecture.md
 
 ## 待办事项
-- [ ] 多场景模拟：detector.py 多路 MP4 → 联动引擎 → 仪表盘三通道 → API/MQTT 扩展
-- [ ] 手机推送通知（PushPlus/Server酱）
-- [ ] 火焰传感器/舵机联调
-- [ ] 论文第3-4章 + 终期答辩PPT
+- [ ] 硬件实物联调（火焰传感器/舵机/ESP8266）
+- [ ] 终期答辩 PPT + 演示流程
+- [ ] 论文第3-4章
 
 ## 已知问题
 - mDNS 未实现（detector.py + ESP32 固件），IP 变化时需手动改代码
 
 ## 技术栈
 Python: Flask, PyTorch, YOLOv8, OpenCV, paho-mqtt | Arduino: ESP8266WiFi, PubSubClient | STM32: HAL UART/GPIO, TIM3 PWM | 前端: Chart.js, 原生 JS
+
+## 论文写作
+_入口：新论文对话启动时读本节 + `docs/writing.md`_
+
+### 工具链
+- npm `docx` 包生成 .docx，不用 python-docx
+- 环境：`F:\bishe\output\`（已有 `package.json` + `node_modules`）
+- 生成脚本：`output/gen_thesis.js`，运行 `node gen_thesis.js`
+
+### 格式常量（gen_thesis.js 已定义）
+| 常量 | 值 | 含义 |
+|------|-----|------|
+| SIMSUN / SIMHEI | "SimSun" / "SimHei" | 正文/标题字体 |
+| PT12 / PT14 / PT15 | 24 / 28 / 30 | 小四/四号/小三 (half-pts) |
+| LINE_SPACING | 360 | 1.5倍行距 |
+| A4 | 11906×16838 | 纸张尺寸 (DXA) |
+| MARGIN | 1440 / 1800 | 上下2.54cm / 左右3.17cm |
+
+### 生成模式
+- 三个 helper：`bodyPara(text)` 宋体小四+缩进、`h2(text)`/`h3(text)` 黑体加粗
+- 内容推入 `children[]` 数组，末位 `new Document({sections:[{children}]})` 打包
+- 输出路径：`F:/bishe/output/论文草稿_第X-Y章.docx`
+- 已生成：第1-2章（17.5 KB）— 可直接参考 gen_thesis.js 里的写法
+- 待生成：第3章（系统设计与实现）、第4章（系统测试与分析）
+
+### 避坑
+- F: 盘 npm 偶发找不到本地模块，`output/` 内自建 package.json 解决
+- 不用 heredoc 写 .js，用 Write 工具直接写入
 
 ## 参考文档
 | 文档 | 内容 |
@@ -48,6 +74,7 @@ Python: Flask, PyTorch, YOLOv8, OpenCV, paho-mqtt | Arduino: ESP8266WiFi, PubSub
 | [帧率问题](docs/ESP32-CAM帧率问题.md) | ESP32-CAM 帧率分析+优化（子对话A入口） |
 | [传输问题](docs/数据传输问题总结.md) | HTTP/MQTT/DB 传输汇总（子对话B入口） |
 | [多场景改造](docs/多场景模拟改造.md) | 三通道联动模拟（子对话入口） |
+| [STM32适配](docs/STM32三通道适配问题.md) | STM32 手动绑定 + 协议适配（子对话入口） |
 | [进度日志](docs/PROGRESS.md) | 完整开发进度 |
 | [硬件引脚](docs/hardware.md) | STM32 引脚定义 |
 | [文档写作](docs/writing.md) | 论文格式、PPT 工作流 |
