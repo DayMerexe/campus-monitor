@@ -73,6 +73,19 @@ channel_active_lock = threading.Lock()
 _active_video_path = {}  # channel -> path
 _active_video_lock = threading.Lock()
 
+# ── 手动重播标志 ──────────────────────────────────
+_replay_flags = {ch: False for ch in CHANNELS}
+_replay_lock = threading.Lock()
+
+
+def request_replay(channel):
+    """前端请求重播某通道视频"""
+    if channel not in CHANNELS:
+        return False
+    with _replay_lock:
+        _replay_flags[channel] = True
+    return True
+
 # ── STM32 手动绑定 ──────────────────────────────────
 stm32_binding = 'A'
 binding_lock = threading.Lock()
@@ -268,57 +281,57 @@ def _open_source(channel):
     with source_config_lock:
         cfg = dict(source_config[channel])
 
+    # ── MJPEG 探测 ──────────────────────────────
     if cfg['type'] == 'mjpeg':
         try:
-            r = requests.get(ESP32_CAM_URL, stream=True, timeout=5)
+            r = requests.get(ESP32_CAM_URL, stream=True, timeout=(3, 3))
             r.close()
             print(f"[通道 A] ESP32-CAM 可达，使用 MJPEG 实时流")
             return 'mjpeg'
         except Exception:
             print(f"[通道 A] ESP32-CAM 不可达，回退 MP4")
-            # 回退到 MP4
-            path = cfg.get('path') or os.path.join(VIDEOS_DIR, 'channel_a.mp4')
-            cap = cv2.VideoCapture(path)
-            if cap.isOpened():
-                return cap
-            else:
-                print(f"[通道 A] MP4 回退文件也不可用: {path}")
-                return None
+            # 更新 source_config 避免后续每次重开都等超时
+            with source_config_lock:
+                source_config[channel] = {'type': 'mp4', 'path': None}
 
-    elif cfg['type'] == 'mp4':
-        path = cfg.get('path')
-        if not path:
-            # 自动扫描 videos/ 目录，排除其他通道已在用的文件
-            files = list_video_files()
-            with _active_video_lock:
-                used = {p for ch, p in _active_video_path.items() if ch != channel}
+    # ── MP4 打开 ────────────────────────────────
+    # 从 source_config 读取最新值（mjpeg 回退时可能已更新）
+    with source_config_lock:
+        path = source_config[channel].get('path')
+
+    if not path:
+        # 自动扫描 videos/ 目录，排除其他通道已在用的文件
+        files = list_video_files()
+        with _active_video_lock:
+            used = {p for ch, p in _active_video_path.items() if ch != channel}
+        for f in files:
+            candidate = os.path.join(VIDEOS_DIR, f)
+            if channel == 'A' and f.startswith('channel_a'):
+                if candidate not in used:
+                    path = candidate
+                    break
+            elif channel in ('B', 'C') and not f.startswith('channel_a'):
+                if candidate not in used:
+                    path = candidate
+                    break
+        if not path and files:
             for f in files:
                 candidate = os.path.join(VIDEOS_DIR, f)
-                if channel == 'A' and f.startswith('channel_a'):
-                    if candidate not in used:
-                        path = candidate
-                        break
-                elif channel in ('B', 'C') and not f.startswith('channel_a'):
-                    if candidate not in used:
-                        path = candidate
-                        break
-            if not path and files:
-                # 没匹配到，取第一个不重复的
-                for f in files:
-                    candidate = os.path.join(VIDEOS_DIR, f)
-                    if candidate not in used:
-                        path = candidate
-                        break
-        if path:
-            cap = cv2.VideoCapture(path)
-            if cap.isOpened():
-                with _active_video_lock:
-                    _active_video_path[channel] = os.path.normpath(path)
-                print(f"[通道 {channel}] MP4 已打开: {os.path.basename(path)}")
-                return cap
-        print(f"[通道 {channel}] 无法打开 MP4: {path or '未指定'}")
+                if candidate not in used:
+                    path = candidate
+                    break
+
+    if path:
+        cap = cv2.VideoCapture(path)
+        if cap.isOpened():
+            with _active_video_lock:
+                _active_video_path[channel] = os.path.normpath(path)
+            print(f"[通道 {channel}] MP4 已打开: {os.path.basename(path)}")
+            return cap
+        print(f"[通道 {channel}] 无法打开 MP4: {path}")
         return None
 
+    print(f"[通道 {channel}] 无可用 MP4 文件")
     return None
 
 
@@ -356,6 +369,17 @@ def detect_loop(channel):
         if not channel_active.get(channel, False):
             time.sleep(0.5)
             continue
+
+        # ── 手动重播检测 ──────────────────────────
+        with _replay_lock:
+            if _replay_flags.get(channel, False):
+                _replay_flags[channel] = False
+                if source is not None and source != 'mjpeg':
+                    source.release()
+                    with _active_video_lock:
+                        _active_video_path.pop(channel, None)
+                source = None
+                last_source_cfg = None  # 强制重匹配
 
         # ── 检查视频源是否变更 ────────────────────
         with source_config_lock:

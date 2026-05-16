@@ -215,6 +215,18 @@ def get_binding():
     return jsonify({'binding': detector.stm32_binding})
 
 
+@app.route('/replay/<channel>', methods=['POST'])
+def replay_video(channel):
+    """手动重播通道视频"""
+    if channel not in detector.CHANNELS:
+        return jsonify({'status': 'error', 'message': 'invalid channel'}), 400
+    ok = detector.request_replay(channel)
+    if not ok:
+        return jsonify({'status': 'error', 'message': 'invalid channel'}), 400
+    print(f"[通道 {channel}] 手动重播")
+    return jsonify({'status': 'ok', 'channel': channel})
+
+
 @app.route('/monitoring/toggle/<channel>', methods=['POST'])
 def toggle_monitoring(channel):
     """每通道独立监测开关"""

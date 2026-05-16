@@ -434,7 +434,7 @@
                 </div>
                 <div class="channel-threshold">
                     <span>阈值:</span>
-                    <input type="number" id="thRed${ch}" value="20" min="1" max="100" style="width:32px;">
+                    <input type="number" id="thRed${ch}" value="20" min="1" max="100" style="width:52px;">
                     <span style="color:var(--amber);">黄</span><span id="thWarn${ch}" style="color:var(--amber);font-weight:600;">12</span>
                     <span style="color:var(--red);">红</span>
                     <button onclick="setThreshold('${ch}')">设置</button>
@@ -724,16 +724,10 @@
 
     // ── 手动重播 ────────────────────────────────
     function replayVideo(channel) {
-        const sel = document.getElementById('srcSel' + channel);
-        const val = sel.value;
-        if (!val) return;
-        const parts = val.split(':');
-        const type = parts[0];
-        const path = parts.length > 1 ? parts[1] : null;
-        fetch('/set_source/' + channel, {
+        fetch('/replay/' + channel, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: type, path: path || null })
+            body: JSON.stringify({})
         }).then(r => r.json()).then(d => {
             if (d.status === 'ok') {
                 const img = document.getElementById('video' + channel);
