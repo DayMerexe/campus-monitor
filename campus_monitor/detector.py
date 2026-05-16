@@ -41,8 +41,8 @@ for ch in CHANNELS:
         'alarm_event_id': None,
         'alarm_max_count': 0,
         # 每通道独立阈值
-        'threshold_red': 5,
-        'threshold_warn': 3,
+        'threshold_red': 20,
+        'threshold_warn': 12,
         # 防抖状态
         'consecutive': 0,
         'normal_frames': 0,
@@ -64,6 +64,14 @@ recommended_exit = None
 servo_open = False
 buzzer_on = False
 manual_alarm_active = False
+
+# ── 每通道监测开关 ──────────────────────────────
+channel_active = {ch: False for ch in CHANNELS}  # 默认全部暂停
+channel_active_lock = threading.Lock()
+
+# ── 视频文件占用追踪（避免两通道同开一个文件）────
+_active_video_path = {}  # channel -> path
+_active_video_lock = threading.Lock()
 
 # ── STM32 手动绑定 ──────────────────────────────────
 stm32_binding = 'A'
@@ -280,21 +288,32 @@ def _open_source(channel):
     elif cfg['type'] == 'mp4':
         path = cfg.get('path')
         if not path:
-            # 自动扫描 videos/ 目录找第一个可用 MP4
+            # 自动扫描 videos/ 目录，排除其他通道已在用的文件
             files = list_video_files()
+            with _active_video_lock:
+                used = {p for ch, p in _active_video_path.items() if ch != channel}
             for f in files:
+                candidate = os.path.join(VIDEOS_DIR, f)
                 if channel == 'A' and f.startswith('channel_a'):
-                    path = os.path.join(VIDEOS_DIR, f)
-                    break
+                    if candidate not in used:
+                        path = candidate
+                        break
                 elif channel in ('B', 'C') and not f.startswith('channel_a'):
-                    path = os.path.join(VIDEOS_DIR, f)
-                    break
+                    if candidate not in used:
+                        path = candidate
+                        break
             if not path and files:
-                # 没匹配到，取第一个
-                path = os.path.join(VIDEOS_DIR, files[0])
+                # 没匹配到，取第一个不重复的
+                for f in files:
+                    candidate = os.path.join(VIDEOS_DIR, f)
+                    if candidate not in used:
+                        path = candidate
+                        break
         if path:
             cap = cv2.VideoCapture(path)
             if cap.isOpened():
+                with _active_video_lock:
+                    _active_video_path[channel] = os.path.normpath(path)
                 print(f"[通道 {channel}] MP4 已打开: {os.path.basename(path)}")
                 return cap
         print(f"[通道 {channel}] 无法打开 MP4: {path or '未指定'}")
@@ -304,17 +323,12 @@ def _open_source(channel):
 
 
 def _read_frame(source):
-    """从输入源读取一帧。返回 frame 或 None"""
+    """从输入源读取一帧。返回 frame 或 None（EOF 时不 seek，由调用方 close+reopen）"""
     if source == 'mjpeg':
         return _read_mjpeg()
     elif source is not None:
         ret, frame = source.read()
-        if ret:
-            return frame
-        else:
-            source.set(cv2.CAP_PROP_POS_FRAMES, 0)
-            ret, frame = source.read()
-            return frame if ret else None
+        return frame if ret else None
     return None
 
 
@@ -338,6 +352,11 @@ def detect_loop(channel):
     print(f"[通道 {channel}] 检测线程已启动")
 
     while True:
+        # ── 监测暂停检查（每通道独立）───────────
+        if not channel_active.get(channel, False):
+            time.sleep(0.5)
+            continue
+
         # ── 检查视频源是否变更 ────────────────────
         with source_config_lock:
             cur_cfg = dict(source_config[channel])
@@ -346,6 +365,8 @@ def detect_loop(channel):
             # 关闭旧源
             if source is not None and source != 'mjpeg':
                 source.release()
+                with _active_video_lock:
+                    _active_video_path.pop(channel, None)
             source = None
             print(f"[通道 {channel}] 视频源配置变更，重新打开...")
 
@@ -360,8 +381,10 @@ def detect_loop(channel):
         frame = _read_frame(source)
         if frame is None:
             if source != 'mjpeg':
-                # MP4 读取失败，尝试重开
+                # MP4 EOF 或读失败，close+reopen
                 source.release()
+                with _active_video_lock:
+                    _active_video_path.pop(channel, None)
                 source = None
             time.sleep(0.1)
             continue
@@ -495,8 +518,12 @@ def generate_frames(channel, stop_event=None):
             placeholder = 255 * np.ones((240, 320, 3), dtype=np.uint8)
             cv2.putText(placeholder, f"{CHANNEL_NAMES.get(channel, channel)}", (60, 110),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
-            cv2.putText(placeholder, "Waiting...", (100, 140),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 1)
+            if not channel_active.get(channel, False):
+                cv2.putText(placeholder, "监测已暂停", (90, 140),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 1)
+            else:
+                cv2.putText(placeholder, "Waiting...", (100, 140),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 1)
             ts = datetime.now().strftime('%H:%M:%S')
             cv2.putText(placeholder, ts, (200, 180),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)

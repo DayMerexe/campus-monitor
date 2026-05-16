@@ -401,6 +401,7 @@
                         <div class="ch-desc">${CH_DESCS[ch]}</div>
                     </div>
                     <div class="ch-status">
+                        <button class="btn" id="btnMon${ch}" onclick="toggleMonitoring('${ch}')" style="font-size:10px;padding:2px 8px;color:var(--green);border-color:rgba(93,219,143,0.2);background:rgba(93,219,143,0.06);flex-shrink:0;">▶</button>
                         <span class="status-dot" id="dot${ch}"></span>
                         <span id="alarmLabel${ch}" style="font-size:11px;">正常</span>
                     </div>
@@ -410,6 +411,7 @@
                     <select id="srcSel${ch}" onchange="changeSource('${ch}')" style="flex:1;min-width:0;">
                         ${srcOpts}
                     </select>
+                    <button class="btn" onclick="replayVideo('${ch}')" style="font-size:10px;padding:3px 8px;flex-shrink:0;" title="重新播放">↻</button>
                 </div>
                 <div class="channel-video">
                     <img id="video${ch}" src="/video_feed/${ch}" alt="通道 ${ch}">
@@ -432,8 +434,8 @@
                 </div>
                 <div class="channel-threshold">
                     <span>阈值:</span>
-                    <input type="number" id="thRed${ch}" value="5" min="1" max="100" style="width:32px;">
-                    <span style="color:var(--amber);">黄</span><span id="thWarn${ch}" style="color:var(--amber);font-weight:600;">3</span>
+                    <input type="number" id="thRed${ch}" value="20" min="1" max="100" style="width:32px;">
+                    <span style="color:var(--amber);">黄</span><span id="thWarn${ch}" style="color:var(--amber);font-weight:600;">12</span>
                     <span style="color:var(--red);">红</span>
                     <button onclick="setThreshold('${ch}')">设置</button>
                 </div>`;
@@ -528,6 +530,10 @@
                         fireInd.style.display = 'none';
                         fireIndLbl.style.display = 'none';
                     }
+
+                    // 监测按钮状态
+                    const monBtn = document.getElementById('btnMon' + ch);
+                    if (monBtn) updateMonButton(monBtn, cd.active);
 
                     // 阈值显示
                     const thWarn = document.getElementById('thWarn' + ch);
@@ -680,6 +686,59 @@
         }).catch(() => {
             btn.textContent = origText;
             btn.style.opacity = '1';
+        });
+    }
+
+    // ── 每通道监测开关 ──────────────────────────
+    function toggleMonitoring(channel) {
+        const btn = document.getElementById('btnMon' + channel);
+        const isActive = btn.textContent === '⏸';
+        const newActive = !isActive;
+        btn.textContent = '...';
+        btn.style.opacity = '0.5';
+        fetch('/monitoring/toggle/' + channel, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ active: newActive })
+        }).then(r => r.json()).then(d => {
+            btn.style.opacity = '1';
+            if (d.status === 'ok') {
+                updateMonButton(btn, d.active);
+            }
+        }).catch(() => { btn.style.opacity = '1'; });
+    }
+
+    function updateMonButton(btn, active) {
+        if (active) {
+            btn.textContent = '⏸';
+            btn.style.color = 'var(--amber)';
+            btn.style.borderColor = 'rgba(245,182,76,0.2)';
+            btn.style.background = 'rgba(245,182,76,0.06)';
+        } else {
+            btn.textContent = '▶';
+            btn.style.color = 'var(--green)';
+            btn.style.borderColor = 'rgba(93,219,143,0.2)';
+            btn.style.background = 'rgba(93,219,143,0.06)';
+        }
+    }
+
+    // ── 手动重播 ────────────────────────────────
+    function replayVideo(channel) {
+        const sel = document.getElementById('srcSel' + channel);
+        const val = sel.value;
+        if (!val) return;
+        const parts = val.split(':');
+        const type = parts[0];
+        const path = parts.length > 1 ? parts[1] : null;
+        fetch('/set_source/' + channel, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: type, path: path || null })
+        }).then(r => r.json()).then(d => {
+            if (d.status === 'ok') {
+                const img = document.getElementById('video' + channel);
+                img.src = '/video_feed/' + channel + '?t=' + Date.now();
+            }
         });
     }
 

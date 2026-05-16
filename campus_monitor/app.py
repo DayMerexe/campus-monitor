@@ -74,6 +74,7 @@ def dashboard():
             s = detector.channel_state[ch]
             fire = tcp_server.flame_active if ch == 'A' else s['fire']
             channels_data[ch] = {
+                'active': detector.channel_active.get(ch, False),
                 'count': s['count'],
                 'alarm_active': s['alarm_active'],
                 'alarm_level': s['alarm_level'],
@@ -212,6 +213,21 @@ def bind_stm32(channel):
 def get_binding():
     """获取当前 STM32 绑定状态"""
     return jsonify({'binding': detector.stm32_binding})
+
+
+@app.route('/monitoring/toggle/<channel>', methods=['POST'])
+def toggle_monitoring(channel):
+    """每通道独立监测开关"""
+    if channel not in detector.CHANNELS:
+        return jsonify({'status': 'error', 'message': 'invalid channel'}), 400
+    data = request.get_json()
+    if data and 'active' in data:
+        with detector.channel_active_lock:
+            detector.channel_active[channel] = bool(data['active'])
+        state = '启动' if detector.channel_active[channel] else '暂停'
+        print(f"[通道 {channel}] 监测{state}")
+        return jsonify({'status': 'ok', 'channel': channel, 'active': detector.channel_active[channel]})
+    return jsonify({'status': 'error'}), 400
 
 
 @app.route('/history')

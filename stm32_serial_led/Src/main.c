@@ -278,6 +278,7 @@ void servo_stop(void) {
   TIM3->CCR1 = 750;
 }
 void servo_open_gate(void) {
+  return;  /* TODO: 演示前删除此行，恢复舵机功能（同时恢复火焰传感器舵机响应） */
   if (gate_open || servo_state) return;
   gate_open = 1;
   servo_state = 1;
@@ -285,6 +286,7 @@ void servo_open_gate(void) {
   TIM3->CCR1 = 300;
 }
 void servo_close_gate(void) {
+  return;  /* TODO: 演示前删除此行，恢复舵机功能 */
   if (!gate_open || servo_state) return;
   gate_open = 0;
   servo_state = 2;
@@ -310,10 +312,10 @@ void set_outputs(int level) {
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_SET);
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
   } else {
-    /* level == 2: 红色报警 */
+    /* level == 2: 红色报警（蜂鸣器临时静音） */
     HAL_GPIO_WritePin(GPIOE, GPIO_PIN_5, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);  /* TODO: 演示前改回 SET */
   }
 }
 /* USER CODE END 4 */
