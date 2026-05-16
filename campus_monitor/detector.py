@@ -204,12 +204,12 @@ def coordinated_decision():
         bound_alarm = bound['alarm_level']
         bound_fire = bound['fire']
 
-        # LV: 绑定通道火灾=2，否则取自身报警等级
-        lv = 2 if bound_fire else bound_alarm
+        # LV: 绑定通道火灾=2，手动报警=2，否则取自身报警等级
+        lv = 2 if (bound_fire or manual_alarm_active) else bound_alarm
         buz = 1 if (lv >= 1) else 0
         servo = 1 if (lv >= 2) else 0
 
-        # 舵机/蜂鸣器由绑定通道的 lv 决定（火焰→lv=2→自然触发）
+        # 舵机/蜂鸣器由绑定通道的 lv 决定
         servo_open = (servo == 1)
         buzzer_on = (buz == 1)
 
