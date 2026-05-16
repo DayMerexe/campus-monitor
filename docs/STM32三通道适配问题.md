@@ -170,6 +170,21 @@ cd F:\bishe\campus_monitor
 
 ---
 
+## 已知问题（待开新对话）
+
+### 折线图显示
+- `index.html` 折线图只有一条「总人数」线，`get_recent_records(20)` 返回三通道混合数据，导致线条上下跳动
+- 改为三条分线（按 `r.channel` 分组），A/B/C 不同颜色
+
+### 仪表盘数据展示
+- `alarm_events` 表缺 `channel` 列，`get_alarm_events()` 不返回通道
+- 前端报警表格缺通道列、历史记录无通道标签
+- 修法：DB 迁移加 `channel` 列 + `insert_alarm_event` 写入通道 + 前端表格加列
+
+**不碰：** `detection_records` 已有 channel，`insert_detection` 已写入，只改展示层
+
+---
+
 ## 协作进度
 
 _子对话在此更新，一项完成追加一行_
@@ -178,6 +193,7 @@ _子对话在此更新，一项完成追加一行_
 |------|---------|------|
 | 2026-05-15 | v3 绑定功能实现 | 4 个 _fixed，已合并 → 6d33a89 |
 | 2026-05-16 | v4 演示优化：视频共用卡死修复（B/C分片）、EOF close+reopen、监测总开关（默认暂停）、手动重播按钮、默认阈值→20、蜂鸣器舵机临时静音 | 4 个 _fixed，已合并 → 7b7dcf4 |
+| 2026-05-16 | v4.1 bugfix：mjpeg→mp4 回退更新 source_config 避免每次重开等超时、重播改为 /replay API + _replay_flags 强制机制、阈值输入框 32→52px、requests timeout=(3,3) | 已合并 → 940cb54 |
 
 ---
 
@@ -185,9 +201,9 @@ _子对话在此更新，一项完成追加一行_
 
 | # | _fixed 文件 | 对应功能 | 自测 | 状态 |
 |---|-----------|---------|------|------|
-| 1 | `detector_fixed.py` | 绑定逻辑 + MQTT 短指令 + 监测开关 + 视频分片 + 阈值默认值 | ✓ py_compile | 已合并 |
-| 2 | `app_fixed.py` | /bind_stm32 + /get_binding + /monitoring/toggle + dashboard | ✓ py_compile | 已合并 |
-| 3 | `index_fixed.html` | 绑定按钮组 + 监测 ▶/⏸ + 重播 ↻ + 蓝色高亮边框 | ✓ | 已合并 |
+| 1 | `detector_fixed.py` | 绑定逻辑 + MQTT 短指令 + 监测开关 + 视频分片 + 阈值默认值 + mjpeg回退+replay强制重开 | ✓ py_compile | 已合并 |
+| 2 | `app_fixed.py` | /bind_stm32 + /get_binding + /monitoring/toggle + /replay + dashboard | ✓ py_compile | 已合并 |
+| 3 | `index_fixed.html` | 绑定按钮组 + 监测 ▶/⏸ + 重播 ↻ + 蓝色高亮边框 + 阈值框52px | ✓ | 已合并 |
 | 4 | `main_fixed.c` → main.c | LV:BUZ:SERVO 解析 + MQTT 舵机 + 火焰恢复 MQTT 状态 + 蜂鸣器舵机静音 | — | 已合并 |
 
 自测：✓=通过 / ✗=有问题 / —=未开始。状态流转：`待产出` → `待审查` → `已合并`
