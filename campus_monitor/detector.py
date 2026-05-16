@@ -573,9 +573,11 @@ def detect_loop(channel):
 
 # ── 视频流生成器 ─────────────────────────────────────
 def generate_frames(channel, stop_event=None):
-    """视频流生成器（每通道独立）"""
-    interval = 0.05
-    last_send = 0.0
+    """视频流生成器（每通道独立，15fps + 相位错开避免三通道抢锁）"""
+    interval = 1.0 / 15
+    # 三通道相位偏移：分散锁竞争，A/B/C 各差 1/3 周期 (~22ms)
+    phase = {'A': 0.0, 'B': interval / 3, 'C': interval * 2 / 3}.get(channel, 0.0)
+    last_send = time.time() - interval + phase
     lk = channel_locks[channel]
     st = channel_state[channel]
 
@@ -597,7 +599,7 @@ def generate_frames(channel, stop_event=None):
             ts = datetime.now().strftime('%H:%M:%S')
             cv2.putText(frame, ts, (frame.shape[1] - 100, 20),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-            ret, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            ret, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 60])
         else:
             placeholder = 255 * np.ones((240, 320, 3), dtype=np.uint8)
             cv2.putText(placeholder, f"{CHANNEL_NAMES.get(channel, channel)}", (60, 110),
@@ -614,7 +616,7 @@ def generate_frames(channel, stop_event=None):
             ts = datetime.now().strftime('%H:%M:%S')
             cv2.putText(placeholder, ts, (200, 180),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
-            ret, jpeg = cv2.imencode('.jpg', placeholder, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            ret, jpeg = cv2.imencode('.jpg', placeholder, [cv2.IMWRITE_JPEG_QUALITY, 60])
             last_send = time.time()
 
         if ret:
