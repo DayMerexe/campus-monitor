@@ -57,6 +57,26 @@
             box-shadow: 0 0 8px rgba(93,219,143,0.2);
         }
         .badge.fire-badge { color: var(--red); display: none; }
+        .top-status {
+            font-size: 15px; font-weight: 700; letter-spacing: 1px;
+            padding: 6px 18px; border-radius: 8px;
+            transition: all 0.4s;
+        }
+        .top-status.normal {
+            color: var(--green);
+            background: rgba(93,219,143,0.08);
+            border: 1px solid rgba(93,219,143,0.2);
+        }
+        .top-status.emergency {
+            color: var(--red);
+            background: rgba(255,90,90,0.1);
+            border: 1px solid rgba(255,90,90,0.3);
+            animation: status-pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes status-pulse {
+            0%, 100% { box-shadow: 0 0 12px rgba(255,90,90,0.2); }
+            50% { box-shadow: 0 0 24px rgba(255,90,90,0.5); }
+        }
 
         .video-row { display: flex; gap: 12px; margin-bottom: 14px; }
         .channel-col {
@@ -120,6 +140,21 @@
             margin-left: 6px;
             background: rgba(100,168,255,0.12);
             padding: 1px 6px; border-radius: 4px;
+        }
+        /* 应急模式通道边框强化 */
+        .channel-col.fire-danger {
+            border-color: rgba(255,60,30,0.55);
+            box-shadow: 0 0 20px rgba(255,60,30,0.2), 0 4px 24px rgba(0,0,0,0.2);
+        }
+        .channel-col.fire-danger .channel-header {
+            background: rgba(255,60,30,0.08);
+        }
+        .channel-col.safe-exit {
+            border-color: rgba(93,219,143,0.45);
+            box-shadow: 0 0 16px rgba(93,219,143,0.12), 0 4px 24px rgba(0,0,0,0.2);
+        }
+        .channel-col.safe-exit .channel-header {
+            background: rgba(93,219,143,0.06);
         }
         .btn-bind {
             padding: 5px 12px; border-radius: 6px;
@@ -235,6 +270,41 @@
             padding: 8px 16px; border-radius: 8px;
             flex-shrink: 0; display: none;
         }
+        /* 应急模式：推荐面板撑满突出 */
+        .recommend-panel.emergency {
+            padding: 28px 32px;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 14px;
+            transition: all 0.4s;
+        }
+        .recommend-panel.emergency.safe-exit {
+            background: rgba(93,219,143,0.1);
+            border-color: rgba(93,219,143,0.4);
+            box-shadow: 0 0 40px rgba(93,219,143,0.12);
+        }
+        .recommend-panel.emergency.all-danger {
+            background: rgba(255,90,90,0.1);
+            border-color: rgba(255,90,90,0.4);
+            box-shadow: 0 0 40px rgba(255,90,90,0.12);
+        }
+        .recommend-panel.emergency .rec-icon { font-size: 52px; }
+        .recommend-panel.emergency .rec-title { font-size: 22px; }
+        .recommend-panel.emergency .rec-detail { font-size: 13px; }
+        .recommend-panel.emergency .rec-exit {
+            display: block;
+            font-size: 30px; font-weight: 700;
+            background: rgba(93,219,143,0.15);
+            color: var(--green);
+            padding: 14px 32px; border-radius: 12px;
+            border: 2px solid rgba(93,219,143,0.3);
+            animation: exit-pulse 1s ease-in-out infinite;
+        }
+        @keyframes exit-pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.03); }
+        }
 
         .control-bar {
             background: var(--glass-bg);
@@ -293,8 +363,26 @@
             padding: 16px 16px 12px;
             min-height: 260px;
             box-shadow: var(--glass-shadow);
+            position: relative;
         }
         .chart-box canvas { width: 100% !important; height: 100% !important; }
+        .chart-box .chart-toggle {
+            position: absolute; top: 8px; right: 12px; z-index: 2;
+            font-size: 10px; color: var(--text-secondary);
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 4px; padding: 2px 8px; cursor: pointer;
+            font-family: inherit;
+        }
+        .chart-box .chart-toggle:hover { background: var(--glass-hover); }
+        .chart-box.collapsed { min-height: auto; }
+        .chart-box.collapsed canvas { display: none; }
+        .chart-box.collapsed .chart-expand-hint {
+            display: flex; align-items: center; justify-content: center;
+            padding: 20px; color: var(--text-dim); font-size: 12px;
+        }
+        .chart-expand-hint { display: none; }
+        .chart-box.collapsed .chart-expand-hint { display: flex; }
         .alarm-section {
             flex: 0 0 380px;
             background: var(--glass-bg);
@@ -328,6 +416,7 @@
             <div class="subtitle">Multi-Channel Crowd Monitoring &amp; Emergency Evacuation System</div>
         </div>
         <div class="top-right">
+            <div class="top-status normal" id="topStatus">🟢 正常运行</div>
             <div class="badge" id="stm32Status" style="color:var(--text-dim);">○ STM32 离线</div>
             <div class="badge fire-badge" id="flameBadge">🔥 火焰报警</div>
         </div>
@@ -359,7 +448,11 @@
     </div>
 
     <div class="bottom-row">
-        <div class="chart-box"><canvas id="trendChart"></canvas></div>
+        <div class="chart-box" id="chartBox">
+            <button class="chart-toggle" id="chartToggle" onclick="toggleChart()" style="display:none;">▼ 折叠</button>
+            <canvas id="trendChart"></canvas>
+            <div class="chart-expand-hint" id="chartExpandHint">📊 折线图已折叠 · <a href="#" onclick="toggleChart();return false;">点击展开</a></div>
+        </div>
         <div class="alarm-section">
             <h3>报警事件记录</h3>
             <div id="alarmTableWrap"><div class="empty-hint">暂无报警记录</div></div>
@@ -374,6 +467,8 @@
 
     let fireState = { B: false, C: false };
     let videoFiles = [];
+    let chartCollapsed = false;
+    let isEmergency = false;
     const PAGE_OPEN_TIME = new Date().toISOString();
 
     // ── 加载 MP4 文件列表 ─────────────────────────
@@ -590,38 +685,95 @@
                     }
                 });
 
-                // 推荐面板
+                // 推荐面板 + 应急模式
                 const rec = d.recommendation;
                 const panel = document.getElementById('recPanel');
                 const recIcon = document.getElementById('recIcon');
                 const recTitle = document.getElementById('recTitle');
                 const recDetail = document.getElementById('recDetail');
                 const recExit = document.getElementById('recExit');
-
-                panel.className = 'recommend-panel';
-                recExit.style.display = 'none';
+                const topStatus = document.getElementById('topStatus');
 
                 const allFire = CHANNELS.every(ch => d.channels[ch].fire);
                 const anyRed = CHANNELS.some(ch => d.channels[ch].alarm_level >= 2);
+                const emergency = anyFire || anyRed;
+                const wasEmergency = isEmergency;
+                isEmergency = emergency;
 
-                if (allFire) {
-                    panel.classList.add('all-danger');
-                    recIcon.textContent = '🚫';
-                    recTitle.textContent = '所有通道危险！请立即远离该区域';
-                    recDetail.textContent = '全部通道发生火灾，无安全出口';
-                } else if (rec.exit) {
-                    if (anyRed) panel.classList.add('danger');
-                    recIcon.textContent = '⭐';
-                    recTitle.textContent = '联动疏散建议';
-                    recDetail.textContent = `检测到拥挤或危险通道，建议人员从 ${CH_NAMES[rec.exit]} 疏散`;
-                    recExit.style.display = 'block';
-                    recExit.textContent = '→ ' + CH_NAMES[rec.exit];
-                    recExit.className = 'rec-exit';
+                // ── 顶部系统状态标签 ──
+                if (emergency) {
+                    topStatus.textContent = '🔴 紧急疏散';
+                    topStatus.className = 'top-status emergency';
                 } else {
-                    panel.classList.add('safe');
-                    recIcon.textContent = '🟢';
-                    recTitle.textContent = '各通道正常通行';
-                    recDetail.textContent = '所有出口流量正常，无需干预';
+                    topStatus.textContent = '🟢 正常运行';
+                    topStatus.className = 'top-status normal';
+                }
+
+                // ── 通道边框强化 ──
+                CHANNELS.forEach((ch, i) => {
+                    const col = document.querySelectorAll('.channel-col')[i];
+                    const cd = d.channels[ch];
+                    if (col) {
+                        col.classList.remove('fire-danger', 'safe-exit');
+                        if (emergency) {
+                            if (cd.fire || cd.alarm_level >= 2) {
+                                col.classList.add('fire-danger');
+                            } else if (rec.exit && ch === rec.exit) {
+                                col.classList.add('safe-exit');
+                            }
+                        }
+                    }
+                });
+
+                // ── 推荐面板双态 ──
+                panel.className = 'recommend-panel';
+                recExit.style.display = 'none';
+
+                if (emergency) {
+                    panel.classList.add('emergency');
+                    if (allFire) {
+                        panel.classList.add('all-danger');
+                        recIcon.textContent = '🚫';
+                        recTitle.textContent = '所有通道危险！请立即远离该区域';
+                        recDetail.textContent = '全部通道发生火灾，无安全出口';
+                    } else if (rec.exit) {
+                        panel.classList.add('safe-exit');
+                        recIcon.textContent = '✅';
+                        recTitle.textContent = '紧急疏散指引';
+                        recDetail.textContent = `检测到危险通道，请从 ${CH_NAMES[rec.exit]} 有序撤离`;
+                        recExit.style.display = 'block';
+                        recExit.textContent = '→ ' + CH_NAMES[rec.exit] + ' 安全撤离';
+                    }
+                } else {
+                    if (rec.exit) {
+                        if (anyRed) panel.classList.add('danger');
+                        recIcon.textContent = '⭐';
+                        recTitle.textContent = '联动疏散建议';
+                        recDetail.textContent = `检测到拥挤或危险通道，建议人员从 ${CH_NAMES[rec.exit]} 疏散`;
+                        recExit.style.display = 'block';
+                        recExit.textContent = '→ ' + CH_NAMES[rec.exit];
+                        recExit.className = 'rec-exit';
+                    } else {
+                        panel.classList.add('safe');
+                        recIcon.textContent = '🟢';
+                        recTitle.textContent = '各通道正常通行';
+                        recDetail.textContent = '所有出口流量正常，无需干预';
+                    }
+                }
+
+                // ── 折线图应急自动折叠 ──
+                const chartBox = document.getElementById('chartBox');
+                const chartToggle = document.getElementById('chartToggle');
+                if (emergency && !wasEmergency && !chartCollapsed) {
+                    chartCollapsed = true;
+                    chartBox.classList.add('collapsed');
+                    chartToggle.textContent = '▶ 展开';
+                    chartToggle.style.display = '';
+                } else if (!emergency && wasEmergency && chartCollapsed) {
+                    chartCollapsed = false;
+                    chartBox.classList.remove('collapsed');
+                    chartToggle.style.display = 'none';
+                    chart.update('none');
                 }
 
                 // 折线图（分通道历史）
@@ -738,6 +890,23 @@
             btn.style.color = 'var(--green)';
             btn.style.borderColor = 'rgba(93,219,143,0.2)';
             btn.style.background = 'rgba(93,219,143,0.06)';
+        }
+    }
+
+    // ── 折线图折叠切换 ────────────────────────────
+    function toggleChart() {
+        chartCollapsed = !chartCollapsed;
+        const box = document.getElementById('chartBox');
+        const toggle = document.getElementById('chartToggle');
+        if (chartCollapsed) {
+            box.classList.add('collapsed');
+            toggle.textContent = '▶ 展开';
+            toggle.style.display = '';
+        } else {
+            box.classList.remove('collapsed');
+            toggle.textContent = '▼ 折叠';
+            if (!isEmergency) toggle.style.display = 'none';
+            chart.update('none');
         }
     }
 
