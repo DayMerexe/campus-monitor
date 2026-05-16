@@ -169,6 +169,10 @@ def coordinated_decision():
     global recommended_exit, servo_open, buzzer_on, _last_broadcast_sig, _last_stm32_sig
     global _last_broadcast_time, _last_stm32_time
 
+    do_broadcast_sig = False
+    do_broadcast_stm32 = False
+    sig = stm32_msg = ''
+
     with coord_lock:
         snap = {}
         for ch in CHANNELS:
@@ -208,7 +212,7 @@ def coordinated_decision():
         servo_open = tcp_server.flame_active or (servo == 1)
         buzzer_on = tcp_server.flame_active or (buz == 1)
 
-        # ── MQTT 新格式（完整多通道数据 + 绑定）─
+        # ── 构建消息，决定是否广播（I/O 放到锁外）──
         sig = f"A:{snap['A']['count']},LA:{snap['A']['alarm_level']}," \
               f"B:{snap['B']['count']},LB:{snap['B']['alarm_level']}," \
               f"C:{snap['C']['count']},LC:{snap['C']['alarm_level']}," \
@@ -220,18 +224,23 @@ def coordinated_decision():
         if sig != _last_broadcast_sig:
             now_t = time.time()
             if now_t - _last_broadcast_time >= MQTT_MIN_INTERVAL:
-                broadcast(sig + '\n')
                 _last_broadcast_sig = sig
                 _last_broadcast_time = now_t
+                do_broadcast_sig = True
 
-        # ── MQTT STM32 短指令（替换旧 COUNT:ALARM 格式）─
         stm32_msg = f"LV:{lv},BUZ:{buz},SERVO:{servo}"
         if stm32_msg != _last_stm32_sig:
             now_t = time.time()
             if now_t - _last_stm32_time >= MQTT_MIN_INTERVAL:
-                broadcast(stm32_msg + '\n')
                 _last_stm32_sig = stm32_msg
                 _last_stm32_time = now_t
+                do_broadcast_stm32 = True
+
+    # ── I/O 在 coord_lock 外执行，不阻塞检测线程 ──
+    if do_broadcast_sig:
+        broadcast(sig + '\n')
+    if do_broadcast_stm32:
+        broadcast(stm32_msg + '\n')
 
 
 # ── 通道 A: MJPEG 读取器 ─────────────────────────────
@@ -374,9 +383,8 @@ def detect_loop(channel):
     normal_frames = 0
     last_state_change = 0.0
     last_source_cfg = None
-    last_detect_time = 0.0
     last_coord_time = 0.0
-    MIN_DETECT_INTERVAL = 1.0 / 25
+    MIN_DETECT_INTERVAL = 1.0 / 15
 
     print(f"[通道 {channel}] 检测线程已启动")
 
@@ -540,7 +548,7 @@ def detect_loop(channel):
             coordinated_decision()
             last_coord_time = now3
 
-        # ── 检测帧率上限 25fps ────────────────────
+        # ── 检测帧率上限 15fps ────────────────────
         detect_elapsed = time.time() - loop_start
         if detect_elapsed < MIN_DETECT_INTERVAL:
             time.sleep(MIN_DETECT_INTERVAL - detect_elapsed)
