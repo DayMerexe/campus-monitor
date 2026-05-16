@@ -336,6 +336,9 @@ def _open_source(channel):
             if chosen:
                 cap = cv2.VideoCapture(chosen)
                 if cap.isOpened():
+                    # 解码器预热，丢弃前几帧（避免首帧黑屏/坏帧）
+                    for _ in range(3):
+                        cap.read()
                     _active_video_path[channel] = os.path.normpath(chosen)
                     print(f"[通道 {channel}] MP4 已打开: {os.path.basename(chosen)}")
                     return cap
@@ -349,6 +352,8 @@ def _open_source(channel):
     path = explicit_path
     cap = cv2.VideoCapture(path)
     if cap.isOpened():
+        for _ in range(3):
+            cap.read()
         with _active_video_lock:
             _active_video_path[channel] = os.path.normpath(path)
         print(f"[通道 {channel}] MP4 已打开: {os.path.basename(path)}")
@@ -358,7 +363,7 @@ def _open_source(channel):
 
 
 def _read_frame(source):
-    """从输入源读取一帧。返回 frame 或 None（EOF 时不 seek，由调用方 close+reopen）"""
+    """从输入源读取一帧。返回 frame 或 None（EOF 时由调用方 seek 到头或 reopen）"""
     if isinstance(source, tuple) and len(source) == 2 and source[0] == 'mjpeg':
         return _read_mjpeg(source[1])
     elif isinstance(source, cv2.VideoCapture):
@@ -434,11 +439,22 @@ def detect_loop(channel):
         frame = _read_frame(source)
         if frame is None:
             if isinstance(source, cv2.VideoCapture):
-                source.release()
-                with _active_video_lock:
-                    _active_video_path.pop(channel, None)
-                source = None
-                time.sleep(0.8)
+                # 循环播放：seek 到开头并验证
+                ok = source.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                if ok:
+                    ret, verify = source.read()
+                    if ret and verify is not None:
+                        frame = verify  # seek 有效，直接用验证帧
+                    else:
+                        ok = False
+                if not ok:
+                    source.release()
+                    with _active_video_lock:
+                        _active_video_path.pop(channel, None)
+                    source = None
+                    time.sleep(0.1)
+                else:
+                    time.sleep(0.02)
             elif source == 'mjpeg_unreachable':
                 with lk:
                     st['frame'] = None
@@ -446,7 +462,8 @@ def detect_loop(channel):
                 source = None
             else:
                 time.sleep(0.1)
-            continue
+            if frame is None:
+                continue
 
         # ── YOLO 推理 ─────────────────────────────
         small = cv2.resize(frame, (320, 240))
