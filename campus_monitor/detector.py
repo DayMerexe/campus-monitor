@@ -297,41 +297,53 @@ def _open_source(channel):
     # ── MP4 打开 ────────────────────────────────
     # 从 source_config 读取最新值（mjpeg 回退时可能已更新）
     with source_config_lock:
-        path = source_config[channel].get('path')
+        explicit_path = source_config[channel].get('path')
 
-    if not path:
-        # 自动扫描 videos/ 目录，排除其他通道已在用的文件
+    if not explicit_path:
+        # 自动扫描 videos/ 目录 —— 选文件+打开+追踪必须是原子操作
         files = list_video_files()
         with _active_video_lock:
             used = {p for ch, p in _active_video_path.items() if ch != channel}
-        for f in files:
-            candidate = os.path.join(VIDEOS_DIR, f)
-            if channel == 'A' and f.startswith('channel_a'):
-                if candidate not in used:
-                    path = candidate
-                    break
-            elif channel in ('B', 'C') and not f.startswith('channel_a'):
-                if candidate not in used:
-                    path = candidate
-                    break
-        if not path and files:
+            # 选出候选文件
+            chosen = None
             for f in files:
                 candidate = os.path.join(VIDEOS_DIR, f)
-                if candidate not in used:
-                    path = candidate
+                if candidate in used:
+                    continue
+                if channel == 'A' and f.startswith('channel_a'):
+                    chosen = candidate
                     break
+                elif channel in ('B', 'C') and not f.startswith('channel_a'):
+                    chosen = candidate
+                    break
+            if not chosen:
+                for f in files:
+                    candidate = os.path.join(VIDEOS_DIR, f)
+                    if candidate not in used:
+                        chosen = candidate
+                        break
 
-    if path:
-        cap = cv2.VideoCapture(path)
-        if cap.isOpened():
-            with _active_video_lock:
-                _active_video_path[channel] = os.path.normpath(path)
-            print(f"[通道 {channel}] MP4 已打开: {os.path.basename(path)}")
-            return cap
-        print(f"[通道 {channel}] 无法打开 MP4: {path}")
+            if chosen:
+                cap = cv2.VideoCapture(chosen)
+                if cap.isOpened():
+                    _active_video_path[channel] = os.path.normpath(chosen)
+                    print(f"[通道 {channel}] MP4 已打开: {os.path.basename(chosen)}")
+                    return cap
+                print(f"[通道 {channel}] 无法打开 MP4: {chosen}")
+                return None
+        # 没有合适的文件
+        print(f"[通道 {channel}] 无可用 MP4 文件")
         return None
 
-    print(f"[通道 {channel}] 无可用 MP4 文件")
+    # 显式指定了路径
+    path = explicit_path
+    cap = cv2.VideoCapture(path)
+    if cap.isOpened():
+        with _active_video_lock:
+            _active_video_path[channel] = os.path.normpath(path)
+        print(f"[通道 {channel}] MP4 已打开: {os.path.basename(path)}")
+        return cap
+    print(f"[通道 {channel}] 无法打开 MP4: {path}")
     return None
 
 

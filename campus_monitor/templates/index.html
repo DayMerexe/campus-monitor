@@ -50,7 +50,12 @@
             border: 1px solid var(--glass-border);
             padding: 4px 10px; border-radius: 6px;
         }
-        .badge.online { color: var(--green); }
+        .badge.online {
+            color: var(--green);
+            border-color: rgba(93,219,143,0.2);
+            background: rgba(93,219,143,0.08);
+            box-shadow: 0 0 8px rgba(93,219,143,0.2);
+        }
         .badge.fire-badge { color: var(--red); display: none; }
 
         .video-row { display: flex; gap: 12px; margin-bottom: 14px; }
@@ -325,7 +330,6 @@
         <div class="top-right">
             <div class="badge" id="stm32Status" style="color:var(--text-dim);">○ STM32 离线</div>
             <div class="badge fire-badge" id="flameBadge">🔥 火焰报警</div>
-            <div class="badge" id="fpsDisplay">FPS: --</div>
         </div>
     </div>
 
@@ -370,6 +374,7 @@
 
     let fireState = { B: false, C: false };
     let videoFiles = [];
+    const PAGE_OPEN_TIME = new Date().toISOString();
 
     // ── 加载 MP4 文件列表 ─────────────────────────
     fetch('/list_videos').then(r => r.json()).then(d => { videoFiles = d.files; buildUI(); });
@@ -498,15 +503,13 @@
 
     // ── 更新仪表盘 ─────────────────────────────
     function updateDashboard() {
-        fetch('/dashboard')
+        fetch('/dashboard?since=' + encodeURIComponent(PAGE_OPEN_TIME))
             .then(r => r.json())
             .then(d => {
-                let totalFps = 0;
                 CHANNELS.forEach(ch => {
                     const cd = d.channels[ch];
                     document.getElementById('count' + ch).textContent = cd.count;
                     document.getElementById('fps' + ch).textContent = cd.fps;
-                    totalFps += cd.fps;
 
                     // 状态灯
                     const dot = document.getElementById('dot' + ch);
@@ -556,9 +559,6 @@
                         inputEl.value = cd.threshold_red;
                     }
                 });
-
-                const activeChannels = CHANNELS.filter(ch => d.channels[ch].active).length || 1;
-                document.getElementById('fpsDisplay').textContent = 'FPS: ' + (totalFps / activeChannels).toFixed(1);
 
                 // STM32
                 const stm = document.getElementById('stm32Status');

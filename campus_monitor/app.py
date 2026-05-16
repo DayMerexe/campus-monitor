@@ -85,7 +85,8 @@ def dashboard():
             }
 
     stats = get_today_stats()
-    channel_history = get_channel_history(20)
+    since = request.args.get('since', None)
+    channel_history = get_channel_history(20, since=since)
     alarm_rows = get_alarm_events(50)
 
     return jsonify({

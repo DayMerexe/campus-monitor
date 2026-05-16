@@ -105,15 +105,22 @@ def get_alarm_events(limit=50):
         return [dict(r) for r in reversed(rows)]
 
 
-def get_channel_history(limit_per_channel=20):
-    """返回每通道最近 N 条检测记录，用于分通道折线图"""
+def get_channel_history(limit_per_channel=20, since=None):
+    """返回每通道最近 N 条检测记录，用于分通道折线图。
+    since: ISO 时间字符串，只返回该时间之后的记录（页面刚打开时传，避免旧数据污染）。"""
     result = {}
     for ch in ['A', 'B', 'C']:
         with get_conn() as conn:
-            rows = conn.execute(
-                'SELECT timestamp, count, alarm, fps FROM detection_records WHERE channel = ? ORDER BY id DESC LIMIT ?',
-                (ch, limit_per_channel)
-            ).fetchall()
+            if since:
+                rows = conn.execute(
+                    'SELECT timestamp, count, alarm, fps FROM detection_records WHERE channel = ? AND timestamp > ? ORDER BY id DESC LIMIT ?',
+                    (ch, since, limit_per_channel)
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    'SELECT timestamp, count, alarm, fps FROM detection_records WHERE channel = ? ORDER BY id DESC LIMIT ?',
+                    (ch, limit_per_channel)
+                ).fetchall()
             result[ch] = [dict(r) for r in reversed(rows)]
     return result
 
