@@ -46,7 +46,7 @@ def _get_channel_state():
     for ch in detector.CHANNELS:
         with detector.channel_locks[ch]:
             s = detector.channel_state[ch]
-            fire = tcp_server.flame_active if ch == "A" else s["fire"]
+            fire = tcp_server.flame_active if ch == detector.stm32_binding else s["fire"]
             channels[ch] = {
                 "count": s["count"],
                 "level": s["alarm_level"],

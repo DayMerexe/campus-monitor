@@ -174,11 +174,14 @@ def coordinated_decision():
     sig = stm32_msg = ''
 
     with coord_lock:
+        # 先获取绑定通道（火焰传感器归属）
+        with binding_lock:
+            bound_ch = stm32_binding
+
         snap = {}
         for ch in CHANNELS:
             with channel_locks[ch]:
                 s = channel_state[ch]
-                # 暂停监测的通道 count/alarm_level 归零，避免过期数据污染 MQTT
                 ch_active = channel_active.get(ch, False)
                 snap[ch] = {
                     'count': s['count'] if ch_active else 0,
@@ -186,8 +189,8 @@ def coordinated_decision():
                     'fire': s['fire'],
                 }
 
-        # 通道 A 的 fire = 实物火焰传感器
-        snap['A']['fire'] = tcp_server.flame_active
+        # 绑定通道的 fire = 物理火焰传感器 OR 模拟按钮
+        snap[bound_ch]['fire'] = tcp_server.flame_active or snap[bound_ch]['fire']
 
         # ── 联动决策（全局推荐，不受绑定影响）───
         safe = [ch for ch in CHANNELS if not snap[ch]['fire']]
@@ -197,8 +200,6 @@ def coordinated_decision():
             recommended_exit = None
 
         # ── STM32 绑定通道决策 ──────────────────
-        with binding_lock:
-            bound_ch = stm32_binding
         bound = snap[bound_ch]
         bound_alarm = bound['alarm_level']
         bound_fire = bound['fire']
@@ -208,9 +209,9 @@ def coordinated_decision():
         buz = 1 if (lv >= 1) else 0
         servo = 1 if (lv >= 2) else 0
 
-        # 全局 servo/buzzer 状态 = 火焰传感器 OR 绑定通道
-        servo_open = tcp_server.flame_active or (servo == 1)
-        buzzer_on = tcp_server.flame_active or (buz == 1)
+        # 舵机/蜂鸣器由绑定通道的 lv 决定（火焰→lv=2→自然触发）
+        servo_open = (servo == 1)
+        buzzer_on = (buz == 1)
 
         # ── 构建消息，决定是否广播（I/O 放到锁外）──
         sig = f"A:{snap['A']['count']},LA:{snap['A']['alarm_level']}," \

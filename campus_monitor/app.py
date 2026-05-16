@@ -72,7 +72,7 @@ def dashboard():
     for ch in detector.CHANNELS:
         with detector.channel_locks[ch]:
             s = detector.channel_state[ch]
-            fire = tcp_server.flame_active if ch == 'A' else s['fire']
+            fire = tcp_server.flame_active if ch == detector.stm32_binding else s['fire']
             vpath = detector._active_video_path.get(ch)
             scfg = detector.source_config.get(ch, {})
             channels_data[ch] = {
