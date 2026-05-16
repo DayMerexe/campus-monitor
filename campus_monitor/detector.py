@@ -389,9 +389,14 @@ def detect_loop(channel):
     last_state_change = 0.0
     last_source_cfg = None
     last_coord_time = 0.0
-    MIN_DETECT_INTERVAL = 1.0 / 15
+    MIN_DETECT_INTERVAL = 1.0 / 20
 
     print(f"[通道 {channel}] 检测线程已启动")
+
+    # 相位错开：避免三通道 YOLO 推理同时抢 GPU/GIL
+    _phase = {'A': 0.0, 'B': MIN_DETECT_INTERVAL / 3, 'C': MIN_DETECT_INTERVAL * 2 / 3}.get(channel, 0.0)
+    if _phase > 0:
+        time.sleep(_phase)
 
     while True:
         # ── 监测暂停检查（每通道独立）───────────
@@ -573,9 +578,9 @@ def detect_loop(channel):
 
 # ── 视频流生成器 ─────────────────────────────────────
 def generate_frames(channel, stop_event=None):
-    """视频流生成器（每通道独立，15fps + 相位错开避免三通道抢锁）"""
-    interval = 1.0 / 15
-    # 三通道相位偏移：分散锁竞争，A/B/C 各差 1/3 周期 (~22ms)
+    """视频流生成器（每通道独立，20fps + 相位错开避免三通道抢锁）"""
+    interval = 1.0 / 20
+    # 三通道相位偏移：分散锁竞争，A/B/C 各差 1/3 周期 (~16.7ms)
     phase = {'A': 0.0, 'B': interval / 3, 'C': interval * 2 / 3}.get(channel, 0.0)
     last_send = time.time() - interval + phase
     lk = channel_locks[channel]
