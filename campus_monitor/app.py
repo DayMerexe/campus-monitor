@@ -74,6 +74,7 @@ def dashboard():
             s = detector.channel_state[ch]
             fire = tcp_server.flame_active if ch == 'A' else s['fire']
             vpath = detector._active_video_path.get(ch)
+            scfg = detector.source_config.get(ch, {})
             channels_data[ch] = {
                 'active': detector.channel_active.get(ch, False),
                 'count': s['count'],
@@ -84,6 +85,8 @@ def dashboard():
                 'threshold_red': s['threshold_red'],
                 'threshold_warn': s['threshold_warn'],
                 'active_source': os.path.basename(vpath) if vpath else None,
+                'source_type': scfg.get('type'),
+                'source_url': scfg.get('url'),
             }
 
     stats = get_today_stats()
@@ -149,12 +152,13 @@ def set_source(channel):
 
     source_type = data['type']
     path = data.get('path')
+    url = data.get('url')
 
     # path 是文件名时补全路径
     if path and not os.path.isabs(path):
         path = os.path.join(detector.VIDEOS_DIR, path)
 
-    ok, err = detector.set_source(channel, source_type, path)
+    ok, err = detector.set_source(channel, source_type, path, url)
     if not ok:
         return jsonify({'status': 'error', 'message': err}), 400
 

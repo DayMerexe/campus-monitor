@@ -51,12 +51,12 @@ for ch in CHANNELS:
     channel_locks[ch] = threading.Lock()
 
 # ── 视频源配置（可运行时切换）─────────────────────────
-# source_config[ch] = {'type': 'mjpeg'|'mp4', 'path': str|None}
+# source_config[ch] = {'type': 'mjpeg'|'mp4', 'path': str|None, 'url': str|None}
 source_config = {}
 source_config_lock = threading.Lock()
 for ch in CHANNELS:
     with source_config_lock:
-        source_config[ch] = {'type': 'mjpeg' if ch == 'A' else 'mp4', 'path': None}
+        source_config[ch] = {'type': 'mp4', 'path': None, 'url': None}
 
 # ── 联动决策全局输出 ─────────────────────────────────
 coord_lock = threading.Lock()
@@ -151,18 +151,16 @@ def list_video_files():
     return [os.path.basename(f) for f in sorted(files)]
 
 
-def set_source(channel, source_type, path=None):
+def set_source(channel, source_type, path=None, url=None):
     """运行时切换通道视频源"""
     if channel not in CHANNELS:
         return False, "invalid channel"
-    if channel == 'A' and source_type not in ('mjpeg', 'mp4'):
-        return False, "通道 A 仅支持 mjpeg/mp4"
-    if channel in ('B', 'C') and source_type != 'mp4':
-        return False, "通道 B/C 仅支持 mp4"
+    if source_type not in ('mjpeg', 'mp4'):
+        return False, "仅支持 mjpeg/mp4"
 
     with source_config_lock:
-        source_config[channel] = {'type': source_type, 'path': path}
-    print(f"[通道 {channel}] 视频源已切换: type={source_type}, path={path or '默认'}")
+        source_config[channel] = {'type': source_type, 'path': path, 'url': url}
+    print(f"[通道 {channel}] 视频源已切换: type={source_type}, path={path or '默认'}, url={url or '默认'}")
     return True, None
 
 
@@ -235,10 +233,12 @@ def coordinated_decision():
 
 
 # ── 通道 A: MJPEG 读取器 ─────────────────────────────
-def _read_mjpeg():
-    """从 ESP32-CAM 读取 MJPEG 流，返回单帧 (numpy array or None)"""
+def _read_mjpeg(url=None):
+    """从 MJPEG 流读取一帧。返回 frame (numpy array) 或 None"""
+    if url is None:
+        url = ESP32_CAM_URL
     try:
-        r = requests.get(ESP32_CAM_URL, stream=True, timeout=10)
+        r = requests.get(url, stream=True, timeout=10)
         if r.status_code != 200:
             return None
     except Exception:
@@ -283,21 +283,18 @@ def _open_source(channel):
 
     # ── MJPEG 探测 ──────────────────────────────
     if cfg['type'] == 'mjpeg':
+        url = cfg.get('url') or ESP32_CAM_URL
         try:
-            r = requests.get(ESP32_CAM_URL, stream=True, timeout=(3, 3))
+            r = requests.get(url, stream=True, timeout=(3, 3))
             r.close()
-            print(f"[通道 A] ESP32-CAM 可达，使用 MJPEG 实时流")
-            return 'mjpeg'
+            print(f"[通道 {channel}] MJPEG 可达: {url}")
+            return ('mjpeg', url)
         except Exception:
-            print(f"[通道 A] ESP32-CAM 不可达，回退 MP4")
-            # 更新 source_config 避免后续每次重开都等超时
-            with source_config_lock:
-                source_config[channel] = {'type': 'mp4', 'path': None}
+            print(f"[通道 {channel}] MJPEG 不可达: {url}")
+            return 'mjpeg_unreachable'
 
     # ── MP4 打开 ────────────────────────────────
-    # 从 source_config 读取最新值（mjpeg 回退时可能已更新）
-    with source_config_lock:
-        explicit_path = source_config[channel].get('path')
+    explicit_path = cfg.get('path')
 
     if not explicit_path:
         # 自动扫描 videos/ 目录 —— 选文件+打开+追踪必须是原子操作
@@ -351,9 +348,9 @@ def _open_source(channel):
 
 def _read_frame(source):
     """从输入源读取一帧。返回 frame 或 None（EOF 时不 seek，由调用方 close+reopen）"""
-    if source == 'mjpeg':
-        return _read_mjpeg()
-    elif source is not None:
+    if isinstance(source, tuple) and len(source) == 2 and source[0] == 'mjpeg':
+        return _read_mjpeg(source[1])
+    elif isinstance(source, cv2.VideoCapture):
         ret, frame = source.read()
         return frame if ret else None
     return None
@@ -388,7 +385,7 @@ def detect_loop(channel):
         with _replay_lock:
             if _replay_flags.get(channel, False):
                 _replay_flags[channel] = False
-                if source is not None and source != 'mjpeg':
+                if source is not None and isinstance(source, cv2.VideoCapture):
                     source.release()
                     with _active_video_lock:
                         _active_video_path.pop(channel, None)
@@ -401,7 +398,7 @@ def detect_loop(channel):
         if cur_cfg != last_source_cfg:
             last_source_cfg = cur_cfg
             # 关闭旧源
-            if source is not None and source != 'mjpeg':
+            if source is not None and isinstance(source, cv2.VideoCapture):
                 source.release()
                 with _active_video_lock:
                     _active_video_path.pop(channel, None)
@@ -418,13 +415,15 @@ def detect_loop(channel):
         # ── 读帧 ──────────────────────────────────
         frame = _read_frame(source)
         if frame is None:
-            if source != 'mjpeg':
-                # MP4 EOF 或读失败，close+reopen
+            if isinstance(source, cv2.VideoCapture):
                 source.release()
                 with _active_video_lock:
                     _active_video_path.pop(channel, None)
                 source = None
-                time.sleep(0.8)  # 避免短视频快速 reopen 循环
+                time.sleep(0.8)
+            elif source == 'mjpeg_unreachable':
+                time.sleep(3)
+                source = None
             else:
                 time.sleep(0.1)
             continue
@@ -560,6 +559,9 @@ def generate_frames(channel, stop_event=None):
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
             if not channel_active.get(channel, False):
                 cv2.putText(placeholder, "监测已暂停", (90, 140),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 1)
+            elif source_config.get(channel, {}).get('type') == 'mjpeg':
+                cv2.putText(placeholder, "摄像头未连接", (85, 140),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 1)
             else:
                 cv2.putText(placeholder, "Waiting...", (100, 140),

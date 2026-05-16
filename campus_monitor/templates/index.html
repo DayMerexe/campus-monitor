@@ -463,7 +463,7 @@
 <script>
     const CHANNELS = ['A', 'B', 'C'];
     const CH_NAMES = { 'A': '出口 A（正门）', 'B': '出口 B（侧门）', 'C': '出口 C（后门）' };
-    const CH_DESCS = { 'A': 'ESP32-CAM 实时流', 'B': 'MP4 模拟视频', 'C': 'MP4 模拟视频' };
+    const CH_DESCS = { 'A': '视频监测流', 'B': '视频监测流', 'C': '视频监测流' };
 
     let fireState = { B: false, C: false };
     let videoFiles = [];
@@ -478,19 +478,12 @@
         const videoRow = document.getElementById('videoRow');
         videoRow.innerHTML = '';
         CHANNELS.forEach(ch => {
-            let srcOpts = '';
-            if (ch === 'A') {
-                srcOpts = '<option value="mjpeg">ESP32-CAM</option>';
-                videoFiles.forEach(f => {
-                    srcOpts += `<option value="mp4:${f}">MP4: ${f}</option>`;
-                });
-            } else {
-                videoFiles.forEach(f => {
-                    const sel = f.includes('channel_' + ch.toLowerCase()) ? ' selected' : '';
-                    srcOpts += `<option value="mp4:${f}"${sel}>${f}</option>`;
-                });
-                if (!srcOpts) srcOpts = '<option value="">无可用视频</option>';
-            }
+            let srcOpts = '<option value="mjpeg">MJPEG: ESP32-CAM</option>';
+            videoFiles.forEach(f => {
+                const sel = f.includes('channel_' + ch.toLowerCase()) ? ' selected' : '';
+                srcOpts += `<option value="mp4:${f}"${sel}>MP4: ${f}</option>`;
+            });
+            if (!videoFiles.length) srcOpts = '<option value="">无可用视频</option>';
 
             const col = document.createElement('div');
             col.className = 'channel-col';
