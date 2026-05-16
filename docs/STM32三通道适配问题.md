@@ -170,18 +170,9 @@ cd F:\bishe\campus_monitor
 
 ---
 
-## 已知问题（待开新对话）
+## 已知问题
 
-### 折线图显示
-- `index.html` 折线图只有一条「总人数」线，`get_recent_records(20)` 返回三通道混合数据，导致线条上下跳动
-- 改为三条分线（按 `r.channel` 分组），A/B/C 不同颜色
-
-### 仪表盘数据展示
-- `alarm_events` 表缺 `channel` 列，`get_alarm_events()` 不返回通道
-- 前端报警表格缺通道列、历史记录无通道标签
-- 修法：DB 迁移加 `channel` 列 + `insert_alarm_event` 写入通道 + 前端表格加列
-
-**不碰：** `detection_records` 已有 channel，`insert_detection` 已写入，只改展示层
+（全部已修复 → 2992023）
 
 ---
 
@@ -193,7 +184,8 @@ _子对话在此更新，一项完成追加一行_
 |------|---------|------|
 | 2026-05-15 | v3 绑定功能实现 | 4 个 _fixed，已合并 → 6d33a89 |
 | 2026-05-16 | v4 演示优化：视频共用卡死修复（B/C分片）、EOF close+reopen、监测总开关（默认暂停）、手动重播按钮、默认阈值→20、蜂鸣器舵机临时静音 | 4 个 _fixed，已合并 → 7b7dcf4 |
-| 2026-05-16 | v4.1 bugfix：mjpeg→mp4 回退更新 source_config 避免每次重开等超时、重播改为 /replay API + _replay_flags 强制机制、阈值输入框 32→52px、requests timeout=(3,3) | 已合并 → 940cb54 |
+| 2026-05-16 | v4.1 bugfix：mjpeg→mp4 回退 + /replay API + 阈值框 52px | 已合并 → 940cb54 |
+| 2026-05-16 | v5 仪表盘修复：折线图分通道（3条线）+ 报警表格加通道/等级列 + alarm_events 加 channel 迁移 + get_channel_history | 已合并 → 2992023 |
 
 ---
 
