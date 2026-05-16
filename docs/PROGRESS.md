@@ -1,5 +1,18 @@
 # 进度日志
 
+## 2026-05-16 (#14) [后端] [前端]
+
+**做了什么：** MJPEG/MP4 视频源统一重构：三通道默认 MP4（不再特殊化 A），MJPEG 不可达显示"摄像头未连接"不回退，B/C 也可选 MJPEG（多摄像头扩展），source_config 加 url 字段，_read_frame 改用 isinstance
+
+**关键决策：**
+- A/B/C 完全对称，不再有"ESP32-CAM 专属通道"
+- 选 MJPEG 不可达时静默回退被移除 — 用户意图优先
+- _fixed 副本工作流：修改→主对话审查→合并
+
+**涉及文件：** `detector_fixed.py`, `app_fixed.py`, `templates/index_fixed.html`
+
+**下一步：** 主对话审查合并 _fixed → 源文件
+
 ## 2026-05-16 (#13) [后端] [前端]
 
 **做了什么：** 主对话审查合并子对话产出：v3 STM32 绑定（MQTT 改 LV:BUZ:SERVO）、v4 演示优化（监测开关/视频分片/静音）、v4.1 mjpeg 回退修复、v5 仪表盘分通道折线图+报警表格通道标签
