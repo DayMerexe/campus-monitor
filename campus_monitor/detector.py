@@ -174,9 +174,11 @@ def coordinated_decision():
         for ch in CHANNELS:
             with channel_locks[ch]:
                 s = channel_state[ch]
+                # 暂停监测的通道 count/alarm_level 归零，避免过期数据污染 MQTT
+                ch_active = channel_active.get(ch, False)
                 snap[ch] = {
-                    'count': s['count'],
-                    'alarm_level': s['alarm_level'],
+                    'count': s['count'] if ch_active else 0,
+                    'alarm_level': s['alarm_level'] if ch_active else 0,
                     'fire': s['fire'],
                 }
 
@@ -372,6 +374,9 @@ def detect_loop(channel):
     normal_frames = 0
     last_state_change = 0.0
     last_source_cfg = None
+    last_detect_time = 0.0
+    last_coord_time = 0.0
+    MIN_DETECT_INTERVAL = 1.0 / 25
 
     print(f"[通道 {channel}] 检测线程已启动")
 
@@ -380,6 +385,8 @@ def detect_loop(channel):
         if not channel_active.get(channel, False):
             time.sleep(0.5)
             continue
+
+        loop_start = time.time()
 
         # ── 手动重播检测 ──────────────────────────
         with _replay_lock:
@@ -411,6 +418,9 @@ def detect_loop(channel):
             if source is None:
                 time.sleep(3)
                 continue
+            if source == 'mjpeg_unreachable':
+                with lk:
+                    st['frame'] = None
 
         # ── 读帧 ──────────────────────────────────
         frame = _read_frame(source)
@@ -422,6 +432,8 @@ def detect_loop(channel):
                 source = None
                 time.sleep(0.8)
             elif source == 'mjpeg_unreachable':
+                with lk:
+                    st['frame'] = None
                 time.sleep(3)
                 source = None
             else:
@@ -522,8 +534,16 @@ def detect_loop(channel):
             frame_count = 0
             fps_timer = now2
 
-        # ── 触发联动决策 ─────────────────────────
-        coordinated_decision()
+        # ── 触发联动决策（每 0.3s 一次，避免每帧锁竞争）─
+        now3 = time.time()
+        if now3 - last_coord_time >= 0.3:
+            coordinated_decision()
+            last_coord_time = now3
+
+        # ── 检测帧率上限 25fps ────────────────────
+        detect_elapsed = time.time() - loop_start
+        if detect_elapsed < MIN_DETECT_INTERVAL:
+            time.sleep(MIN_DETECT_INTERVAL - detect_elapsed)
 
 
 # ── 视频流生成器 ─────────────────────────────────────
