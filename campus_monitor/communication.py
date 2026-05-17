@@ -46,7 +46,7 @@ def _parse_topic(topic):
     返回 (device_id, field) 或 (None, None)
     """
     parts = topic.split("/")
-    if len(parts) >= 5 and parts[0] == "bishe" and parts[1] == "99257":
+    if len(parts) >= 4 and parts[0] == "bishe" and parts[1] == "99257":
         return parts[2], parts[3]  # device_id, field
     return None, None
 
