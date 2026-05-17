@@ -586,7 +586,7 @@
 
         // MP4：隐藏 URL 输入框，直接切换
         urlInput.style.display = 'none';
-        applySource(channel, 'mp4', val);
+        applySource(channel, 'mp4', val.substring(4));  // 去掉 "mp4:" 前缀
     }
 
     // MJPEG URL 输入框回车确认
