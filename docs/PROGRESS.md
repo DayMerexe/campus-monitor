@@ -1,5 +1,13 @@
 # 进度日志
 
+## 2026-05-17 (#28) [多场景] MJPEG 源切换修复 + 小修合集
+
+- MJPEG 冻结帧修复：源切换不清旧帧 → `st['frame']=None` + 读帧失败清帧重试 + 诊断输出 (916ef5e)
+- MP4 路径前缀修复：下拉选项值 `mp4:` 前缀未去除 → `substring(4)` (a3afb57)
+- MJPEG UX：✓确认按钮 + placeholder + 自动聚焦 (400b059)
+- CH_DESCS 删除 + MQTT server 伪设备过滤 (d0025bb)
+- 数据传输对话：MJPEG 持久连接 — 删探针 + per-thread 缓存 + raw.read() (01e3b66, de65b3d, 749529f)
+
 ## 2026-05-17 (#27) [后端] [修复]
 
 **做了什么：** MJPEG 读帧修复 — 分支 `feature/mjpeg-read-fix`。之前 `feature/mjpeg-persistent-connection` (#8) 合并后线上报 "[MJPEG] 未收到有效 JPEG 帧"。排查发现 3 个 bug：
@@ -15,7 +23,7 @@
 
 **涉及文件：** `detector.py`（+25/-27 行）, `docs/传输修复指南.md`
 
-**下一步：** 审查 → 合并 `feature/mjpeg-read-fix`
+**下一步：** 已合并 → e22779c
 
 ---
 
