@@ -463,7 +463,6 @@
 <script>
     const CHANNELS = ['A', 'B', 'C'];
     const CH_NAMES = { 'A': '出口 A（正门）', 'B': '出口 B（侧门）', 'C': '出口 C（后门）' };
-    const CH_DESCS = { 'A': '视频监测流', 'B': '视频监测流', 'C': '视频监测流' };
 
     let fireState = { A: false, B: false, C: false };
     let videoFiles = [];
@@ -492,7 +491,8 @@
                 `<div class="channel-header">
                     <div>
                         <div class="ch-name">${CH_NAMES[ch]}</div>
-                        <div class="ch-desc">${CH_DESCS[ch]}</div>
+
+
                     </div>
                     <div class="ch-status">
                         <button class="btn" id="btnMon${ch}" onclick="toggleMonitoring('${ch}')" style="font-size:10px;padding:2px 8px;color:var(--green);border-color:rgba(93,219,143,0.2);background:rgba(93,219,143,0.06);flex-shrink:0;">▶</button>

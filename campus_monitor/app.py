@@ -312,6 +312,4 @@ if __name__ == '__main__':
 
     time.sleep(2)
     print(f"🚀 Web 服务已启动: http://localhost:5000")
-    print(f"   通道 A: ESP32-CAM MJPEG（不可用时 MP4 回退）")
-    print(f"   通道 B/C: MP4 循环播放（videos/ 目录自动扫描）")
     app.run(host='0.0.0.0', port=5000, threaded=True, debug=False)

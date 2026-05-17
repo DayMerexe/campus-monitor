@@ -88,7 +88,7 @@ def on_mqtt_message(client, userdata, msg):
     payload = msg.payload.decode()
     device_id, field = _parse_topic(topic)
 
-    if device_id is None:
+    if device_id is None or device_id == 'server':
         return
 
     _ensure_device(device_id)
