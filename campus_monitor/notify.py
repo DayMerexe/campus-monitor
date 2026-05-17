@@ -17,7 +17,7 @@ _COOLDOWN_YELLOW = 60  # 黄色：60 秒/通道
 _COOLDOWN_CLEAR = 30   # 全部恢复：30 秒全局
 
 _last_sent = {}        # {channel: {'time': ts, 'level': int}}
-_last_clear_time = 0.0
+_last_clear = {}       # {channel: timestamp} 每通道独立解除冷却
 
 
 def _should_send(channel, level, is_fire):
@@ -171,46 +171,58 @@ def alarm_notify(channel, level, count):
 
 
 def alarm_clear_notify(channel, peak):
-    """报警解除通知 — 仅所有通道恢复时发送一次"""
-    global _last_clear_time
+    """报警解除通知 — 每通道独立发送，附其他通道报警状态"""
+    global _last_clear
 
     try:
         channels, rec, _ = _get_channel_state()
-        any_alarm = any(
-            channels[ch]["level"] > 0 for ch in channels
-        ) if channels else False
     except Exception:
-        any_alarm = False
         channels, rec = None, {}
 
-    if any_alarm:
-        print(f"📱 钉钉静默: {channel} 恢复，其他通道仍在报警，不发送")
-        return
-
-    # 全部恢复：检查全局冷却
+    # 每通道独立冷却
     now = time.time()
-    if now - _last_clear_time < _COOLDOWN_CLEAR:
-        print(f"📱 钉钉冷却: 全部恢复 剩余 {int(_COOLDOWN_CLEAR - (now - _last_clear_time))}s")
+    last = _last_clear.get(channel, 0)
+    if now - last < _COOLDOWN_CLEAR:
+        print(f"📱 钉钉冷却: {channel} 解除 剩余 {int(_COOLDOWN_CLEAR - (now - last))}s")
         return
-    _last_clear_time = now
+    _last_clear[channel] = now
+
+    # 其他仍在报警的通道（含火灾）
+    other_alarms = []
+    if channels:
+        other_alarms = [ch for ch in channels
+                       if ch != channel and (channels[ch]["level"] > 0 or channels[ch]["fire"])]
 
     name = CHANNEL_NAMES.get(channel, channel)
     body = f"**{name}** 报警已解除（期间峰值 **{peak}** 人）\n\n"
+
+    if other_alarms:
+        alarm_names = '、'.join(CHANNEL_NAMES.get(ch, ch) for ch in other_alarms)
+        body += f"⚠️ 注意：{alarm_names} 仍处于报警状态\n\n"
 
     if channels:
         body += "**当前各出口状态：**\n"
         for ch in ["A", "B", "C"]:
             if ch in channels:
                 s = channels[ch]
-                icon = "🟢" if s["level"] == 0 else "⚠️" if s["level"] == 1 else "🔴"
+                if s["fire"]:
+                    icon = "🔥"
+                elif s["level"] >= 2:
+                    icon = "🔴"
+                elif s["level"] >= 1:
+                    icon = "⚠️"
+                else:
+                    icon = "🟢"
                 body += f"{icon} {CHANNEL_NAMES.get(ch, ch)}：{s['count']}人\n"
         body += "\n"
 
-    rec_msg = rec.get('message', '') if isinstance(rec, dict) else ''
-    rec_strategy = rec.get('strategy', 'all_clear') if isinstance(rec, dict) else 'all_clear'
-    if rec_strategy != 'all_clear' and rec_msg:
-        body += f"💡 {rec_msg}\n\n"
-    else:
-        body += "所有通道恢复正常通行\n"
+    if not other_alarms:
+        rec_msg = rec.get('message', '') if isinstance(rec, dict) else ''
+        rec_strategy = rec.get('strategy', 'all_clear') if isinstance(rec, dict) else 'all_clear'
+        if rec_strategy != 'all_clear' and rec_msg:
+            body += f"💡 {rec_msg}\n\n"
+        else:
+            body += "所有通道恢复正常通行\n"
 
-    send_notification("✅ 全部恢复", body)
+    title = f"✅ {name} 恢复" if other_alarms else "✅ 全部恢复"
+    send_notification(title, body)
