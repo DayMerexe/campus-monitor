@@ -505,7 +505,8 @@
                     <select id="srcSel${ch}" onchange="onSourceSelect('${ch}')" style="flex:1;min-width:0;">
                         ${srcOpts}
                     </select>
-                    <input id="mjpegUrl${ch}" type="text" value="${DEFAULT_MJPEG_URL}" style="flex:2;min-width:0;display:none;font-size:10px;padding:2px 4px;" placeholder="MJPEG URL" onkeydown="if(event.key==='Enter') confirmMjpegUrl('${ch}')">
+                    <input id="mjpegUrl${ch}" type="text" value="${DEFAULT_MJPEG_URL}" style="flex:2;min-width:0;display:none;font-size:10px;padding:2px 4px;" placeholder="输入URL后点✓" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmMjpegUrl('${ch}')}">
+                    <button id="mjpegConfirm${ch}" class="btn" onclick="confirmMjpegUrl('${ch}')" style="display:none;font-size:10px;padding:2px 5px;flex-shrink:0;" title="确认连接">✓</button>
                     <span id="srcHint${ch}" style="font-size:9px;color:var(--amber);display:none;flex-shrink:0;">⏸暂停切换</span>
                     <button class="btn" onclick="replayVideo('${ch}')" style="font-size:10px;padding:3px 8px;flex-shrink:0;" title="重新播放">↻</button>
                 </div>
@@ -577,15 +578,18 @@
         const val = sel.value;
         if (!val) return;
         const urlInput = document.getElementById('mjpegUrl' + channel);
+        const confirmBtn = document.getElementById('mjpegConfirm' + channel);
 
         if (val === 'mjpeg') {
-            // 选 MJPEG：显示 URL 输入框
             urlInput.style.display = '';
-            return;  // 等用户填好 URL 后按回车确认
+            confirmBtn.style.display = '';
+            urlInput.focus();
+            urlInput.select();
+            return;
         }
 
-        // MP4：隐藏 URL 输入框，直接切换
         urlInput.style.display = 'none';
+        confirmBtn.style.display = 'none';
         applySource(channel, 'mp4', val.substring(4));  // 去掉 "mp4:" 前缀
     }
 
