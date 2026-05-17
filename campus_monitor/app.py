@@ -11,6 +11,7 @@ from db import init_db, get_recent_records, get_alarm_events, get_today_stats, g
 import detector
 from communication import broadcast, mqtt_init
 import communication
+from notify import alarm_notify, alarm_clear_notify
 
 app = Flask(__name__)
 
@@ -207,13 +208,19 @@ def fire_simulate(channel):
         with detector.channel_locks[channel]:
             if action == 'on':
                 detector.channel_state[channel]['fire'] = True
+                count = detector.channel_state[channel]['count']
                 print(f"🔥 [通道 {channel}] 火灾模拟触发！")
             elif action == 'off':
                 detector.channel_state[channel]['fire'] = False
+                peak = detector.channel_state[channel]['alarm_max_count']
                 print(f"✅ [通道 {channel}] 火灾模拟解除")
             else:
                 return jsonify({'status': 'error', 'message': 'action 必须为 on/off'}), 400
         detector.coordinated_decision()
+        if action == 'on':
+            alarm_notify(channel, 2, count)
+        elif action == 'off':
+            alarm_clear_notify(channel, peak)
         return jsonify({'status': 'ok', 'channel': channel, 'fire': detector.channel_state[channel]['fire']})
     return jsonify({'status': 'error'}), 400
 
