@@ -15,6 +15,25 @@
 
 ---
 
+## 2026-05-17 (#31) [引导算法] 饱和度排序 + 多出口 + 四策略 + 钉钉通知联动
+
+**做了什么：** 重写 `coordinated_decision()` 引导算法。`recommended_exit` 从单字符串改为结构化 dict，算法从 1 行 `min()` 升级为饱和度排序四策略判定。钉钉通知联动适配多出口文案 + 饱和度百分比。前端推荐面板适配 dict 结构。
+
+**关键决策：**
+- 四策略：`all_clear`(无需引导) / `guided`(推荐多出口) / `degraded`(分批通行) / `emergency`(全火灾)
+- 饱和度 = count / threshold_warn，排序替代绝对人数
+- 暂停通道从推荐列表排除
+- SIG 新增 `STR:` 字段，`REC:` 支持逗号多出口
+- `coordinated_decision()` 回写 fire 状态到 `channel_state`，notify.py 修复 fire 检测
+
+**涉及文件：** `detector.py`, `notify.py`, `templates/index.html`
+
+**分支：** `feature/guidance-algorithm` (82e89c7)
+
+**下一步：** 主对话审查合并
+
+---
+
 ## 2026-05-17 (#28) [多场景] MJPEG 源切换修复 + 小修合集
 
 - MJPEG 冻结帧修复：源切换不清旧帧 → `st['frame']=None` + 读帧失败清帧重试 + 诊断输出 (916ef5e)
