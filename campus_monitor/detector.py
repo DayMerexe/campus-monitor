@@ -86,19 +86,47 @@ def request_replay(channel):
         _replay_flags[channel] = True
     return True
 
-# ── STM32 手动绑定 ──────────────────────────────────
-stm32_binding = 'A'
-binding_lock = threading.Lock()
+# ── STM32 多设备绑定 ──────────────────────────────────
+device_bindings = {}  # {device_id: channel}  如 {"stm32_01": "A", "stm32_02": "B"}
+device_bind_lock = threading.Lock()
 
 
-def set_binding(channel):
-    """手动切换 STM32 绑定的监控通道"""
-    global stm32_binding
-    if channel not in CHANNELS:
+def set_binding(device_id, channel=None):
+    """绑定/解绑设备到通道。channel=None 时解绑。"""
+    global device_bindings
+    if channel is not None and channel not in CHANNELS:
         return False
-    with binding_lock:
-        stm32_binding = channel
+    with device_bind_lock:
+        if channel is None:
+            device_bindings.pop(device_id, None)
+        else:
+            device_bindings[device_id] = channel
     return True
+
+
+def get_bound_channels():
+    """返回所有被物理 STM32 绑定的通道集合"""
+    with device_bind_lock:
+        return set(device_bindings.values())
+
+
+def get_channel_device(channel):
+    """返回绑定到某通道的第一个在线设备 ID（火焰传感器查询用），无为 None"""
+    with device_bind_lock:
+        for dev_id, ch in device_bindings.items():
+            if ch == channel and communication.devices.get(dev_id, {}).get('online'):
+                return dev_id
+        return None
+
+
+# 向后兼容 — 首个绑定通道
+stm32_binding = 'A'
+
+
+def _sync_stm32_binding():
+    global stm32_binding
+    with device_bind_lock:
+        stm32_binding = next(iter(device_bindings.values())) if device_bindings else 'A'
 
 
 # 报警防抖参数（每通道复用）
@@ -106,11 +134,12 @@ ALARM_CONFIRM = 3
 ALARM_LOCK = 3.0
 
 # MQTT 广播节流
-MQTT_MIN_INTERVAL = 0.5  # 最小发送间隔（秒），避免三通道同时发送刷屏
+MQTT_MIN_INTERVAL = 0.5
 _last_broadcast_sig = None
-_last_stm32_sig = None
+_last_stm32_sig = None  # 向后兼容，不再用于多设备节流
 _last_broadcast_time = 0.0
 _last_stm32_time = 0.0
+_last_stm32_per_device = {}  # {device_id: (msg, time)} 每设备独立节流
 
 # ── 加载 YOLO 模型 ───────────────────────────────────
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -166,18 +195,14 @@ def set_source(channel, source_type, path=None, url=None):
 
 # ── 联动决策引擎 ─────────────────────────────────────
 def coordinated_decision():
-    global recommended_exit, servo_open, buzzer_on, _last_broadcast_sig, _last_stm32_sig
-    global _last_broadcast_time, _last_stm32_time
+    global recommended_exit, servo_open, buzzer_on
+    global _last_broadcast_sig, _last_broadcast_time
 
     do_broadcast_sig = False
-    do_broadcast_stm32 = False
-    sig = stm32_msg = ''
+    per_device_msgs = {}  # {device_id: stm32_msg}
 
     with coord_lock:
-        # 先获取绑定通道（火焰传感器归属）
-        with binding_lock:
-            bound_ch = stm32_binding
-
+        # ── 快照所有通道状态 ──
         snap = {}
         for ch in CHANNELS:
             with channel_locks[ch]:
@@ -189,39 +214,63 @@ def coordinated_decision():
                     'fire': s['fire'],
                 }
 
-        # 绑定通道的 fire = 物理火焰传感器 OR 模拟按钮
-        snap[bound_ch]['fire'] = communication.flame_active or snap[bound_ch]['fire']
+        # ── 每通道 fire 来自其绑定设备的物理传感器 ──
+        with device_bind_lock:
+            bindings_snapshot = dict(device_bindings)
+        for dev_id, ch in bindings_snapshot.items():
+            dev = communication.devices.get(dev_id, {})
+            if dev.get('online') and dev.get('flame'):
+                snap[ch]['fire'] = True
 
-        # ── 联动决策（全局推荐，不受绑定影响）───
+        # ── 联动推荐（全局）───
         safe = [ch for ch in CHANNELS if not snap[ch]['fire']]
         if safe:
             recommended_exit = min(safe, key=lambda ch: snap[ch]['count'])
         else:
             recommended_exit = None
 
-        # ── STM32 绑定通道决策 ──────────────────
-        bound = snap[bound_ch]
-        bound_alarm = bound['alarm_level']
-        bound_fire = bound['fire']
+        # ── 每设备独立 STM32 指令 ──
+        # 无显式绑定时，自动将首个在线设备绑到默认通道（向后兼容）
+        if not bindings_snapshot:
+            for dev_id, dev in communication.devices.items():
+                if dev.get('online'):
+                    with device_bind_lock:
+                        if not device_bindings:  # 双重检查
+                            device_bindings[dev_id] = stm32_binding
+                            bindings_snapshot = dict(device_bindings)
+                            print(f"🔗 自动绑定: {dev_id} → 通道 {stm32_binding}")
+                    break
 
-        # LV: 绑定通道火灾=2，手动报警=2，否则取自身报警等级
-        lv = 2 if (bound_fire or manual_alarm_active) else bound_alarm
-        buz = 1 if (lv >= 1) else 0
-        servo = 1 if (lv >= 2) else 0
+        any_servo = False
+        any_buzzer = False
+        for dev_id, ch in bindings_snapshot.items():
+            dev = communication.devices.get(dev_id, {})
+            if not dev.get('online'):
+                continue
+            bound = snap[ch]
+            lv = 2 if (bound['fire'] or manual_alarm_active) else bound['alarm_level']
+            buz = 1 if (lv >= 1) else 0
+            servo = 1 if (lv >= 2) else 0
+            per_device_msgs[dev_id] = f"LV:{lv},BUZ:{buz},SERVO:{servo}"
+            if servo:
+                any_servo = True
+            if buz:
+                any_buzzer = True
 
-        # 舵机/蜂鸣器由绑定通道的 lv 决定
-        servo_open = (servo == 1)
-        buzzer_on = (buz == 1)
+        servo_open = any_servo
+        buzzer_on = any_buzzer
 
-        # ── 构建消息，决定是否广播（I/O 放到锁外）──
+        # ── 向后兼容 ──
+        _sync_stm32_binding()
+
+        # ── SIG 消息（仪表盘用，去掉 BIND 字段）──
         sig = f"A:{snap['A']['count']},LA:{snap['A']['alarm_level']}," \
               f"B:{snap['B']['count']},LB:{snap['B']['alarm_level']}," \
               f"C:{snap['C']['count']},LC:{snap['C']['alarm_level']}," \
               f"REC:{recommended_exit or 'X'}," \
               f"FIRE_A:{1 if snap['A']['fire'] else 0}," \
               f"FIRE_B:{1 if snap['B']['fire'] else 0}," \
-              f"FIRE_C:{1 if snap['C']['fire'] else 0}," \
-              f"BIND:{bound_ch}"
+              f"FIRE_C:{1 if snap['C']['fire'] else 0}"
         if sig != _last_broadcast_sig:
             now_t = time.time()
             if now_t - _last_broadcast_time >= MQTT_MIN_INTERVAL:
@@ -229,19 +278,15 @@ def coordinated_decision():
                 _last_broadcast_time = now_t
                 do_broadcast_sig = True
 
-        stm32_msg = f"LV:{lv},BUZ:{buz},SERVO:{servo}"
-        if stm32_msg != _last_stm32_sig:
-            now_t = time.time()
-            if now_t - _last_stm32_time >= MQTT_MIN_INTERVAL:
-                _last_stm32_sig = stm32_msg
-                _last_stm32_time = now_t
-                do_broadcast_stm32 = True
-
-    # ── I/O 在 coord_lock 外执行，不阻塞检测线程 ──
+    # ── I/O 在锁外执行 ──
     if do_broadcast_sig:
         broadcast(sig + '\n')
-    if do_broadcast_stm32:
-        broadcast(stm32_msg + '\n')
+    for dev_id, msg in per_device_msgs.items():
+        prev_msg, prev_time = _last_stm32_per_device.get(dev_id, (None, 0.0))
+        now_t = time.time()
+        if msg != prev_msg and now_t - prev_time >= MQTT_MIN_INTERVAL:
+            _last_stm32_per_device[dev_id] = (msg, now_t)
+            communication.mqtt_send_to(dev_id, msg + '\n')
 
 
 # ── 通道 A: MJPEG 读取器 ─────────────────────────────

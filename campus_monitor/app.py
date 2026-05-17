@@ -72,7 +72,13 @@ def dashboard():
     for ch in detector.CHANNELS:
         with detector.channel_locks[ch]:
             s = detector.channel_state[ch]
-            fire = communication.flame_active if ch == detector.stm32_binding else s['fire']
+            fire = s['fire']  # 模拟火焰
+            # 绑定设备的物理火焰覆盖模拟
+            dev_id = detector.get_channel_device(ch)
+            if dev_id:
+                dev = communication.devices.get(dev_id, {})
+                if dev.get('online') and dev.get('flame'):
+                    fire = True
             vpath = detector._active_video_path.get(ch)
             scfg = detector.source_config.get(ch, {})
             channels_data[ch] = {
@@ -82,6 +88,7 @@ def dashboard():
                 'alarm_level': s['alarm_level'],
                 'fps': round(s['fps'], 1),
                 'fire': fire,
+                'bound_device': dev_id,
                 'threshold_red': s['threshold_red'],
                 'threshold_warn': s['threshold_warn'],
                 'active_source': os.path.basename(vpath) if vpath else None,
@@ -100,8 +107,9 @@ def dashboard():
             'exit': detector.recommended_exit,
             'servo_open': detector.servo_open,
             'buzzer_on': detector.buzzer_on,
-            'stm32_binding': detector.stm32_binding,
+            'device_bindings': dict(detector.device_bindings),
         },
+        'devices': communication.devices,
         'status': {
             'today_detections': stats['total_detections'],
             'today_alarms': stats['alarm_count'],
@@ -185,11 +193,11 @@ def manual_control():
 
 @app.route('/fire_simulate/<channel>', methods=['POST'])
 def fire_simulate(channel):
-    """火灾模拟：为非绑定通道设置虚拟火焰（绑定通道由物理传感器接管）"""
+    """火灾模拟：已绑物理 STM32 的通道由传感器接管，其余可模拟"""
     if channel not in detector.CHANNELS:
         return jsonify({'status': 'error', 'message': 'invalid channel'}), 400
-    if channel == detector.stm32_binding:
-        return jsonify({'status': 'error', 'message': f'通道 {channel} 由物理火焰传感器控制，不支持模拟'}), 400
+    if channel in detector.get_bound_channels():
+        return jsonify({'status': 'error', 'message': f'通道 {channel} 已绑定物理 STM32，不支持模拟'}), 400
 
     data = request.get_json()
     if data and 'action' in data:
@@ -208,22 +216,34 @@ def fire_simulate(channel):
     return jsonify({'status': 'error'}), 400
 
 
-@app.route('/bind_stm32/<channel>', methods=['POST'])
-def bind_stm32(channel):
-    """手动切换 STM32 绑定的监控通道"""
-    if channel not in detector.CHANNELS:
+@app.route('/bind_stm32', methods=['POST'])
+def bind_stm32():
+    """绑定 STM32 设备到指定通道。body: {device_id, channel}"""
+    data = request.get_json()
+    if not data or 'device_id' not in data:
+        return jsonify({'status': 'error', 'message': '需要 device_id'}), 400
+    device_id = data['device_id']
+    channel = data.get('channel')  # None=解绑
+    if channel is not None and channel not in detector.CHANNELS:
         return jsonify({'status': 'error', 'message': 'invalid channel'}), 400
-    ok = detector.set_binding(channel)
+    ok = detector.set_binding(device_id, channel)
     if not ok:
         return jsonify({'status': 'error', 'message': 'invalid channel'}), 400
-    print(f"[绑定] STM32 已切换到通道 {channel}")
-    return jsonify({'status': 'ok', 'binding': channel})
+    if channel:
+        print(f"[绑定] {device_id} → 通道 {channel}")
+    else:
+        print(f"[解绑] {device_id}")
+    return jsonify({'status': 'ok', 'device_id': device_id, 'channel': channel})
 
 
-@app.route('/get_binding')
-def get_binding():
-    """获取当前 STM32 绑定状态"""
-    return jsonify({'binding': detector.stm32_binding})
+@app.route('/get_bindings')
+def get_bindings():
+    """获取所有设备绑定 + 设备状态"""
+    return jsonify({
+        'device_bindings': dict(detector.device_bindings),
+        'devices': communication.devices,
+        'bound_channels': list(detector.get_bound_channels()),
+    })
 
 
 @app.route('/replay/<channel>', methods=['POST'])

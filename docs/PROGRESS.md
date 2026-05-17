@@ -1,5 +1,23 @@
 # 进度日志
 
+## 2026-05-17 (#24) [后端] [前端]
+
+**做了什么：** 多 STM32 设备绑定改造：`stm32_binding` 单值 → `device_bindings` 字典，每设备独立 LV:BUZ:SERVO 指令，per-device MQTT 节流。前端从固定三按钮改为动态设备列表+通道下拉。火焰模拟按钮按 `bound_device` 显隐。
+
+**关键决策：**
+- `coordinated_decision()` 遍历 `device_bindings`，每个在线设备根据其绑定通道的状态独立计算 lv/buz/servo
+- 各设备发各自 alarm topic（`communication.mqtt_send_to()`），互不干扰
+- 全局 `servo_open`/`buzzer_on` 为 OR（任一设备红色即开），保持仪表盘兼容
+- 每通道 fire = 绑定设备的物理火焰 OR 模拟按钮，/dashboard 正确返回
+- `/fire_simulate` 用 `get_bound_channels()` 替代 `== stm32_binding` 判断
+- `/bind_stm32` API 改为 POST body `{device_id, channel}`，支持 channel=null 解绑
+
+**涉及文件：** `detector.py`, `app.py`, `templates/index.html`
+
+**下一步：** 已合并
+
+---
+
 ## 2026-05-17 (#23) [后端] [硬件]
 
 **做了什么：** 多 STM32 MQTT 接入改造：通配符订阅 + devices 字典 + broadcast 遍历在线设备、ESP8266_MQTT_multi.ino（DEVICE_ID 宏 + topic 拼串）。保留 flame_active/stm32_connected 聚合属性向后兼容。TCP Server 已废弃，app.py 同步删除线程启动。

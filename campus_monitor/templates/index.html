@@ -435,9 +435,8 @@
 
     <div class="control-bar">
         <span style="font-size:11px;color:var(--text-secondary);">STM32绑定:</span>
-        <button class="btn-bind active" id="btnBindA" onclick="bindStm32('A')">出口A</button>
-        <button class="btn-bind" id="btnBindB" onclick="bindStm32('B')">出口B</button>
-        <button class="btn-bind" id="btnBindC" onclick="bindStm32('C')">出口C</button>
+        <div id="deviceBindRow" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;"></div>
+        <span style="font-size:11px;color:var(--text-dim);display:none;" id="noDeviceHint">无设备</span>
         <div class="sep"></div>
         <span style="font-size:11px;color:var(--text-secondary);">火灾模拟:</span>
         <button class="btn btn-fire-on" id="btnFireA" onclick="fireSimulate('A')" style="display:none;">🔥 出口A</button>
@@ -700,10 +699,41 @@
                     }
                 });
 
-                // STM32
+                // ── 多设备绑定 UI ──────────────────
+                const deviceBindings = d.recommendation.device_bindings || {};
+                const devices = d.devices || {};
+                const deviceIds = Object.keys(devices).sort();
+                const bindRow = document.getElementById('deviceBindRow');
+                const noDevHint = document.getElementById('noDeviceHint');
+
+                if (deviceIds.length === 0) {
+                    bindRow.innerHTML = '';
+                    if (noDevHint) noDevHint.style.display = '';
+                } else {
+                    if (noDevHint) noDevHint.style.display = 'none';
+                    bindRow.innerHTML = deviceIds.map(did => {
+                        const dev = devices[did];
+                        const online = dev.online;
+                        const boundCh = deviceBindings[did] || '';
+                        const color = online ? 'var(--green)' : 'var(--text-dim)';
+                        const label = online ? '●' : '○';
+                        let selOpts = '<option value="">— 解绑 —</option>';
+                        CHANNELS.forEach(ch => {
+                            const sel = boundCh === ch ? ' selected' : '';
+                            selOpts += `<option value="${ch}"${sel}>出口${ch}</option>`;
+                        });
+                        return `<span style="font-size:10px;color:${color};white-space:nowrap;">${label} ${did}</span>
+                            <select onchange="bindDevice('${did}', this.value)" style="font-size:10px;padding:1px 4px;">
+                                ${selOpts}
+                            </select>`;
+                    }).join('');
+                }
+
+                // 在线设备计数
+                const onlineCount = deviceIds.filter(did => devices[did].online).length;
                 const stm = document.getElementById('stm32Status');
-                if (d.status.stm32_online) {
-                    stm.textContent = '● STM32 在线';
+                if (onlineCount > 0) {
+                    stm.textContent = `● ${onlineCount} STM32 在线`;
                     stm.className = 'badge online';
                 } else {
                     stm.textContent = '○ STM32 离线';
@@ -711,25 +741,24 @@
                     stm.style.color = 'var(--text-dim)';
                 }
 
-                // 火焰徽章（任一通道 fire=true 即显示）
+                // 火焰徽章
                 const anyFire = CHANNELS.some(ch => d.channels[ch].fire);
                 const fb = document.getElementById('flameBadge');
                 fb.style.display = anyFire ? 'inline-block' : 'none';
 
-                // ── STM32 绑定状态 ──────────────────
-                const binding = d.recommendation.stm32_binding || 'A';
+                // ── 通道绑定状态 + 火焰按钮显隐 ──
                 CHANNELS.forEach((ch, i) => {
-                    const btn = document.getElementById('btnBind' + ch);
                     const col = document.querySelectorAll('.channel-col')[i];
                     const fireBtn = document.getElementById('btnFire' + ch);
-                    if (ch === binding) {
-                        if (btn) btn.classList.add('active');
-                        if (col) col.classList.add('bound');
-                        if (fireBtn) fireBtn.style.display = 'none';
-                    } else {
-                        if (btn) btn.classList.remove('active');
-                        if (col) col.classList.remove('bound');
-                        if (fireBtn) fireBtn.style.display = '';
+                    const cd = d.channels[ch];
+                    // bound_device 存在 → 通道有物理 STM32 → 隐藏模拟按钮
+                    const hasPhysical = !!cd.bound_device;
+                    if (col) {
+                        if (hasPhysical) col.classList.add('bound');
+                        else col.classList.remove('bound');
+                    }
+                    if (fireBtn) {
+                        fireBtn.style.display = hasPhysical ? 'none' : '';
                     }
                 });
 
@@ -994,28 +1023,14 @@
         });
     }
 
-    // ── STM32 绑定切换 ────────────────────────────
-    function bindStm32(channel) {
-        // 先更新 UI（乐观更新）
-        CHANNELS.forEach(ch => {
-            const btn = document.getElementById('btnBind' + ch);
-            const col = document.querySelectorAll('.channel-col')[CHANNELS.indexOf(ch)];
-            if (ch === channel) {
-                btn.classList.add('active');
-                if (col) col.classList.add('bound');
-            } else {
-                btn.classList.remove('active');
-                if (col) col.classList.remove('bound');
-            }
-        });
-
-        fetch('/bind_stm32/' + channel, {
+    // ── 设备绑定 ────────────────────────────────
+    function bindDevice(deviceId, channel) {
+        fetch('/bind_stm32', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({})
+            body: JSON.stringify({ device_id: deviceId, channel: channel || null })
         }).then(r => r.json()).then(d => {
             if (d.status !== 'ok') {
-                // 失败回滚由下次 dashboard 轮询修正
                 console.warn('绑定失败:', d);
             }
         }).catch(() => {});
