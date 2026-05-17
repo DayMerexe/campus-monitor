@@ -471,6 +471,7 @@
     let chartCollapsed = false;
     let isEmergency = false;
     const PAGE_OPEN_TIME = new Date().toISOString();
+    const DEFAULT_MJPEG_URL = "http://192.168.139.183:81/stream";
 
     // ── 加载 MP4 文件列表 ─────────────────────────
     fetch('/list_videos').then(r => r.json()).then(d => { videoFiles = d.files; buildUI(); });
@@ -502,9 +503,10 @@
                 </div>
                 <div class="ch-source-row">
                     <span>源:</span>
-                    <select id="srcSel${ch}" onchange="changeSource('${ch}')" style="flex:1;min-width:0;">
+                    <select id="srcSel${ch}" onchange="onSourceSelect('${ch}')" style="flex:1;min-width:0;">
                         ${srcOpts}
                     </select>
+                    <input id="mjpegUrl${ch}" type="text" value="${DEFAULT_MJPEG_URL}" style="flex:2;min-width:0;display:none;font-size:10px;padding:2px 4px;" placeholder="MJPEG URL" onkeydown="if(event.key==='Enter') confirmMjpegUrl('${ch}')">
                     <span id="srcHint${ch}" style="font-size:9px;color:var(--amber);display:none;flex-shrink:0;">⏸暂停切换</span>
                     <button class="btn" onclick="replayVideo('${ch}')" style="font-size:10px;padding:3px 8px;flex-shrink:0;" title="重新播放">↻</button>
                 </div>
@@ -571,20 +573,38 @@
     });
 
     // ── 视频源切换 ───────────────────────────────
-    function changeSource(channel) {
+    function onSourceSelect(channel) {
         const sel = document.getElementById('srcSel' + channel);
         const val = sel.value;
         if (!val) return;
-        const parts = val.split(':');
-        const type = parts[0];
-        const path = parts.length > 1 ? parts[1] : null;
+        const urlInput = document.getElementById('mjpegUrl' + channel);
+
+        if (val === 'mjpeg') {
+            // 选 MJPEG：显示 URL 输入框
+            urlInput.style.display = '';
+            return;  // 等用户填好 URL 后按回车确认
+        }
+
+        // MP4：隐藏 URL 输入框，直接切换
+        urlInput.style.display = 'none';
+        applySource(channel, 'mp4', val);
+    }
+
+    // MJPEG URL 输入框回车确认
+    function confirmMjpegUrl(channel) {
+        const urlInput = document.getElementById('mjpegUrl' + channel);
+        const url = urlInput.value.trim();
+        if (!url) return;
+        applySource(channel, 'mjpeg', null, url);
+    }
+
+    function applySource(channel, type, path, url) {
         fetch('/set_source/' + channel, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: type, path: path || null })
+            body: JSON.stringify({ type: type, path: path || null, url: url || null })
         }).then(r => r.json()).then(d => {
             if (d.status === 'ok') {
-                // 刷新视频流
                 const img = document.getElementById('video' + channel);
                 img.src = '/video_feed/' + channel + '?t=' + Date.now();
             }

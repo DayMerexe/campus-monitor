@@ -176,6 +176,16 @@ cd F:\bishe\campus_monitor
 
 ---
 
+## 远期想法（演示后扩展）
+
+### 多 ESP32-CAM 支持
+- 当前：通道 A 硬编码 `ESP32_CAM_URL`，B/C 只能用 MP4 模拟
+- 扩展：`source_config[ch]` 加 `url` 字段，每通道可接入独立 MJPEG 地址
+- 改动量小：`_open_source` 用配置 URL 替代硬编码，前端源选择加 "自定义 MJPEG 地址" 输入
+- 多摄像头场景：每个出口一块 ESP32-CAM，各自配 URL
+
+---
+
 ## 协作进度
 
 _子对话在此更新，一项完成追加一行_
@@ -187,6 +197,13 @@ _子对话在此更新，一项完成追加一行_
 | 2026-05-16 | v4.1 bugfix：mjpeg→mp4 回退 + /replay API + 阈值框 52px | 已合并 → 940cb54 |
 | 2026-05-16 | v5 仪表盘修复：折线图分通道（3条线）+ 报警表格加通道/等级列 + alarm_events 加 channel 迁移 + get_channel_history | 已合并 → 2992023 |
 | 2026-05-16 | v5.1 bugfix：_open_source 竞态修复（文件选择+追踪原子化）、STM32 绿标发光效果、移除顶栏 FPS | 已合并 → bab6989 |
+| 2026-05-16 | v6 应急双态模式：顶部状态大标签 + 推荐面板双态 + 通道红绿边框 + 折线图自动折叠（详见 `仪表盘应急模式.md`）| 已合并 → e194236 |
+| 2026-05-16 | v6.1 恢复蜂鸣器+舵机：main.c 删除 `return;` 桩代码，PB8 level=2 改 SET | 已提交 → b7cb6a5 |
+| 2026-05-16 | v6.2 bugfix：toggleMonitoring 启动后未刷新视频 src → 浏览器无画面（补 index.html）；EOF 后 0.8s 延迟防重开刷屏（补 detector.py）| 已合并 → 572ab3a |
+| 2026-05-16 | v6.3 bugfix：B/C 通道文件分配串号 — 每通道优先匹配 `channel_<ch>` | 已合并 → 572ab3a |
+| 2026-05-16 | v6.4 视频源选择逻辑：/dashboard 加 active_source + /monitoring/toggle 冲突检查(409) + 前端下拉灰化占用文件 + 监测中禁用下拉 + 启动前 UI 预检 | 已合并 → 572ab3a |
+| 2026-05-16 | v6.5 MJPEG/MP4 源统一：三通道全默认 MP4，MJPEG 不可达不回退，B/C 也可选 MJPEG，source_config 加 url，_read_frame 改用 isinstance | 已合并 → 83c4687 |
+| 2026-05-16 | v7 火焰传感器去硬编码：归属跟随 STM32 绑定，删除冗余 OR 逻辑 | 已合并 → cfb58e4 |
 
 ---
 
@@ -206,7 +223,9 @@ _子对话在此更新，一项完成追加一行_
 |---|-----------|---------|------|------|
 | 1 | `detector_fixed.py` | 绑定+短指令+监测开关+视频分片+mjpeg回退+replay+竞态原子化 | ✓ py_compile | 已合并 |
 | 2 | `app_fixed.py` | /bind_stm32 + /get_binding + /monitoring/toggle + /replay + dashboard + since | ✓ py_compile | 已合并 |
-| 3 | `index_fixed.html` | 绑定按钮+监测▶/⏸+重播↻+阈值52px+STM32绿标发光-顶栏FPS+since | ✓ | 已合并 |
-| 4 | `main_fixed.c` → main.c | LV:BUZ:SERVO 解析 + MQTT 舵机 + 火焰恢复 MQTT 状态 + 蜂鸣器舵机静音 | — | 已合并 |
+| 3 | `index_fixed.html` | 绑定+监测▶/⏸+重播↻+阈值52px+STM32绿标发光-顶栏FPS+since + 应急双态 + 视频刷新 + 下拉灰化/禁用/预检 + **MJPEG/MP4统一下拉** | ✓ | 已合并 → 83c4687 |
+| 4 | `main_fixed.c` → main.c | LV:BUZ:SERVO 解析 + MQTT 舵机 + 火焰恢复 MQTT 状态 + **蜂鸣器舵机已恢复**。_fixed 已过期已删除 | — | 待烧录 |
+| 5 | `detector_fixed.py` | 绑定+短指令+监测开关+视频分片+mjpeg回退+replay+竞态原子化 + EOF延迟 + B/C文件前缀匹配 + **MJPEG/MP4源统一** | ✓ py_compile | 已合并 → 83c4687 |
+| 6 | `app_fixed.py` | /bind_stm32 + /get_binding + /monitoring/toggle + /replay + dashboard + since + active_source + 409冲突检查 + **source_type/source_url + url透传** | ✓ py_compile | 已合并 → 83c4687 |
 
 自测：✓=通过 / ✗=有问题 / —=未开始。状态流转：`待产出` → `待审查` → `已合并`

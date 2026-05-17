@@ -1,5 +1,61 @@
 # 进度日志
 
+## 2026-05-17 (#21) [前端]
+
+**做了什么：** MJPEG 多摄像头支持：每通道下拉选 MJPEG 时显示 URL 输入框（预填默认 ESP32 IP），用户可修改为第二个 ESP32-CAM 的地址后回车确认，后端 `set_source` 已原生支持 `url` 参数无需改动。
+
+**关键决策：**
+- 方案选 A（URL 输入框）而非摄像头列表配置 — 目前仅一个 ESP32-CAM，最小改动
+- `changeSource()` 拆为 `onSourceSelect()`（下拉切换）+ `confirmMjpegUrl()`（回车确认）+ `applySource()`（调用 API）
+- 选 MJPEG 时不自动应用，等用户填好 URL 回车确认，避免误用默认 IP
+
+**涉及文件：** `templates/index.html`, `templates/index_fixed.html`
+
+**下一步：** 主对话审查合并 _fixed → 源文件
+
+---
+
+## 2026-05-17 (#20) [配置]
+
+**做了什么：** 项目状态终态确认：硬件（STM32 + 火焰传感器 + 舵机 + 蜂鸣器）全部验证通过，软件 v7.1 功能完整。明确剩余工作：YOLO 重训练 → ESP32-CAM 接入 → 论文 → 答辩 PPT。
+
+**关键决策：**
+- 系统软件侧 2755 行核心代码、15 个 API 路由，功能终态确认
+- 硬件实物联调完成（STM32 烧录 + 前端联合测试通过）
+- 剩余工作优先级：YOLO 训练 > 论文 > 答辩 PPT
+
+**下一步：** 启动 YOLO 模型完整训练（50 epoch, batch=8）
+
+---
+
+## 2026-05-17 (#19) [硬件] [配置]
+
+**做了什么：** STM32 硬件验证通过 + 论文旧文档清理：STM32 已烧录 main.c，网页↔STM32 MQTT 双向通信正常，舵机/蜂鸣器/LED 全部功能正常。清理论文旧文档（CLAUDE.md 论文写作段 + docs/writing.md + output/ 旧草稿），待用户提供新材料后重建。
+
+**关键决策：**
+- 硬件实物联调完成，STM32 功能全部验证通过
+- 论文章节数不应限于 4 章，旧工具链和草稿全部清除，等新材料重新设计
+
+**下一步：** ESP32-CAM 摄像头接入测试 / YOLO 重训练
+
+---
+
+## 2026-05-17 (#18) [AI]
+
+**做了什么：** YOLO 数据集准备 + 训练启动：评估 crowd-control/1 模型（不可用）→ 下载其数据集 → 切帧 388 张 + YOLOv8n 预标注 → 三源合并 3330 张（crowd-control 1023 + AIxunlian 2000 + 本地 307）→ 训练脚本就绪但 2 次 OOM 未跑完
+
+**关键决策：**
+- crowd-control/1 预训练模型 mAP 39.93% 不如 YOLOv8n 默认，且仅 API 调用延迟 400ms+，放弃
+- crowd-control 数据集过滤 >100 人的极端密集图，保留 1023 张
+- AIxunlian 限 2000 张（防近景大头照影响小目标检测）
+- RTX 3060 6GB 显存不足：batch=16 OOM，需 batch=8 + workers=2
+
+**涉及文件：** `merge_datasets.py`（新建）、`train.py`（新建）、`datasets/merged/`（3330张）、`label.sh`、`generate_test_videos.py`
+
+**下一步：** 清残留进程 → 手动跑 `python train.py` → 换 `best.pt` 到 detector.py
+
+---
+
 ## 2026-05-17 (#17) [配置] [AI]
 
 **做了什么：** CLAUDE.md 论文写作部分重构（npm docx 工具链 + 格式常量 + 避坑）+ YOLO 训练脚本就绪（merge_datasets.py + train.py）+ 系统功能终态确认
