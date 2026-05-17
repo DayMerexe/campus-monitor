@@ -258,7 +258,7 @@ def coordinated_decision():
             crowded_chs = [ch for ch in safe_active
                           if snap[ch]['alarm_level'] > 0 or sat[ch] >= 0.8]
 
-            if not crowded_chs:
+            if not crowded_chs and not fire_channels:
                 recommended_exit = {
                     'exits': [], 'strategy': 'all_clear',
                     'saturations': sat, 'message': '各通道畅通，无需引导',
