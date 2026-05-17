@@ -290,14 +290,17 @@ def coordinated_decision():
 
 
 # ── MJPEG 持久连接缓存 ────────────────────────────────
-_mjpeg_streams = {}      # {url: requests.Response}  复用连接，避免每帧新建 TCP
+_mjpeg_streams = {}      # {(url, thread_id): requests.Response}  per-thread 避免竞争
 _mjpeg_streams_lock = threading.Lock()
 
 
-def _close_mjpeg(url):
+def _close_mjpeg(url, tid=None):
     """关闭指定 URL 的 MJPEG 持久连接"""
+    if tid is None:
+        tid = threading.get_ident()
+    key = (url, tid)
     with _mjpeg_streams_lock:
-        r = _mjpeg_streams.pop(url, None)
+        r = _mjpeg_streams.pop(key, None)
     if r is not None:
         try:
             r.close()
@@ -311,24 +314,33 @@ def _read_mjpeg(url=None):
     if url is None:
         url = ESP32_CAM_URL
 
+    tid = threading.get_ident()
+    key = (url, tid)
+
     # ── 复用已有连接，没有则新建 ──────────────
     with _mjpeg_streams_lock:
-        r = _mjpeg_streams.get(url)
+        r = _mjpeg_streams.get(key)
     if r is None:
         try:
             r = requests.get(url, stream=True, timeout=(3, 5))
             if r.status_code != 200:
                 print(f"[MJPEG] HTTP {r.status_code} from {url}")
+                try: r.close()
+                except Exception: pass
                 return None
         except Exception as e:
             print(f"[MJPEG] 连接失败 {url}: {e}")
             return None
         with _mjpeg_streams_lock:
-            _mjpeg_streams[url] = r
+            _mjpeg_streams[key] = r
 
     buf = b''
     try:
-        for chunk in r.iter_content(chunk_size=8192):
+        # 直接用 raw.read() 避免 iter_content() 生成器 GC 问题
+        while True:
+            chunk = r.raw.read(8192)
+            if not chunk:
+                raise ConnectionError("流已关闭")
             buf += chunk
             a = buf.find(b'\xff\xd8')
             if a == -1:
@@ -348,11 +360,11 @@ def _read_mjpeg(url=None):
             frame = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
             if frame is not None:
                 return frame
-    except (requests.ConnectionError, requests.Timeout) as e:
+    except (requests.ConnectionError, requests.Timeout, ConnectionError) as e:
         print(f"[MJPEG] 流读取中断 {url}: {e}")
-        _close_mjpeg(url)
-    print(f"[MJPEG] 未收到有效 JPEG 帧 {url}")
-    _close_mjpeg(url)
+    except Exception as e:
+        print(f"[MJPEG] 未知错误 {url}: {type(e).__name__}: {e}")
+    _close_mjpeg(url, tid)
     return None
 
 
@@ -362,17 +374,11 @@ def _open_source(channel):
     with source_config_lock:
         cfg = dict(source_config[channel])
 
-    # ── MJPEG 探测 ──────────────────────────────
+    # ── MJPEG ─────────────────────────────────
     if cfg['type'] == 'mjpeg':
         url = cfg.get('url') or ESP32_CAM_URL
-        try:
-            r = requests.get(url, stream=True, timeout=(3, 3))
-            r.close()
-            print(f"[通道 {channel}] MJPEG 可达: {url}")
-            return ('mjpeg', url)
-        except Exception:
-            print(f"[通道 {channel}] MJPEG 不可达: {url}")
-            return 'mjpeg_unreachable'
+        print(f"[通道 {channel}] MJPEG 源: {url}")
+        return ('mjpeg', url)
 
     # ── MP4 打开 ────────────────────────────────
     explicit_path = cfg.get('path')
@@ -510,9 +516,6 @@ def detect_loop(channel):
             if source is None:
                 time.sleep(3)
                 continue
-            if source == 'mjpeg_unreachable':
-                with lk:
-                    st['frame'] = None
 
         # ── 读帧 ──────────────────────────────────
         frame = _read_frame(source)
@@ -534,11 +537,6 @@ def detect_loop(channel):
                     time.sleep(0.1)
                 else:
                     time.sleep(0.02)
-            elif source == 'mjpeg_unreachable':
-                with lk:
-                    st['frame'] = None
-                time.sleep(3)
-                source = None
             elif isinstance(source, tuple) and source[0] == 'mjpeg':
                 # MJPEG 读帧失败 — 清旧帧 + 重试
                 with lk:
