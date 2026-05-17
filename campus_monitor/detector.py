@@ -290,8 +290,9 @@ def coordinated_decision():
 
 
 # ── MJPEG 持久连接缓存 ────────────────────────────────
-_mjpeg_streams = {}      # {(url, thread_id): requests.Response}  per-thread 避免竞争
-_mjpeg_streams_lock = threading.Lock()
+# per-thread 隔离：{(url, thread_id): {'r': Response, 'gen': generator, 'buf': bytes}}
+_mjpeg_connections = {}
+_mjpeg_conn_lock = threading.Lock()
 
 
 def _close_mjpeg(url, tid=None):
@@ -299,28 +300,28 @@ def _close_mjpeg(url, tid=None):
     if tid is None:
         tid = threading.get_ident()
     key = (url, tid)
-    with _mjpeg_streams_lock:
-        r = _mjpeg_streams.pop(key, None)
-    if r is not None:
+    with _mjpeg_conn_lock:
+        entry = _mjpeg_connections.pop(key, None)
+    if entry is not None:
         try:
-            r.close()
+            entry['r'].close()
         except Exception:
             pass
 
 
 # ── MJPEG 读取器 ─────────────────────────────────────
 def _read_mjpeg(url=None):
-    """从 MJPEG 流读取一帧（持久连接）。返回 frame (numpy array) 或 None"""
+    """从 MJPEG 流读取一帧（持久连接 + 持久生成器）。返回 frame (numpy array) 或 None"""
     if url is None:
         url = ESP32_CAM_URL
 
     tid = threading.get_ident()
     key = (url, tid)
 
-    # ── 复用已有连接，没有则新建 ──────────────
-    with _mjpeg_streams_lock:
-        r = _mjpeg_streams.get(key)
-    if r is None:
+    # ── 复用已有连接/生成器，没有则新建 ──────────
+    with _mjpeg_conn_lock:
+        entry = _mjpeg_connections.get(key)
+    if entry is None:
         try:
             r = requests.get(url, stream=True, timeout=(3, 5))
             if r.status_code != 200:
@@ -331,16 +332,19 @@ def _read_mjpeg(url=None):
         except Exception as e:
             print(f"[MJPEG] 连接失败 {url}: {e}")
             return None
-        with _mjpeg_streams_lock:
-            _mjpeg_streams[key] = r
+        entry = {
+            'r': r,
+            'gen': r.iter_content(chunk_size=8192),
+            'buf': b'',
+        }
+        with _mjpeg_conn_lock:
+            _mjpeg_connections[key] = entry
 
-    buf = b''
+    # ── 从持久生成器读取，跨调用保持 buf 不丢数据 ─
+    gen = entry['gen']
+    buf = entry['buf']
     try:
-        # 直接用 raw.read() 避免 iter_content() 生成器 GC 问题
-        while True:
-            chunk = r.raw.read(8192)
-            if not chunk:
-                raise ConnectionError("流已关闭")
+        for chunk in gen:
             buf += chunk
             a = buf.find(b'\xff\xd8')
             if a == -1:
@@ -359,7 +363,10 @@ def _read_mjpeg(url=None):
 
             frame = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
             if frame is not None:
+                entry['buf'] = buf  # 保存跨调用残余数据
                 return frame
+        # 生成器耗尽（流结束）
+        raise ConnectionError("流已关闭")
     except (requests.ConnectionError, requests.Timeout, ConnectionError) as e:
         print(f"[MJPEG] 流读取中断 {url}: {e}")
     except Exception as e:
