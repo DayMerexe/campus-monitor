@@ -295,10 +295,12 @@ def _read_mjpeg(url=None):
     if url is None:
         url = ESP32_CAM_URL
     try:
-        r = requests.get(url, stream=True, timeout=10)
+        r = requests.get(url, stream=True, timeout=(3, 5))
         if r.status_code != 200:
+            print(f"[MJPEG] HTTP {r.status_code} from {url}")
             return None
-    except Exception:
+    except Exception as e:
+        print(f"[MJPEG] 连接失败 {url}: {e}")
         return None
 
     buf = b''
@@ -321,15 +323,16 @@ def _read_mjpeg(url=None):
                 continue
 
             frame = cv2.imdecode(np.frombuffer(jpg, dtype=np.uint8), cv2.IMREAD_COLOR)
-            return frame
-    except (requests.ConnectionError, requests.Timeout):
-        pass
+            if frame is not None:
+                return frame
+    except (requests.ConnectionError, requests.Timeout) as e:
+        print(f"[MJPEG] 流读取中断: {e}")
     finally:
         try:
             r.close()
         except Exception:
             pass
-    return None
+    print(f"[MJPEG] 未收到有效 JPEG 帧")
 
 
 # ── 通道读取 ─────────────────────────────────────────
@@ -474,6 +477,8 @@ def detect_loop(channel):
                 with _active_video_lock:
                     _active_video_path.pop(channel, None)
             source = None
+            with lk:
+                st['frame'] = None  # 清旧帧，避免冻结画面
             print(f"[通道 {channel}] 视频源配置变更，重新打开...")
 
         # ── 打开/重连源 ────────────────────────────
@@ -511,6 +516,11 @@ def detect_loop(channel):
                     st['frame'] = None
                 time.sleep(3)
                 source = None
+            elif isinstance(source, tuple) and source[0] == 'mjpeg':
+                # MJPEG 读帧失败 — 清旧帧 + 重试
+                with lk:
+                    st['frame'] = None
+                time.sleep(0.5)
             else:
                 time.sleep(0.1)
             if frame is None:
