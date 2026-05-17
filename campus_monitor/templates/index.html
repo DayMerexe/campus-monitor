@@ -203,6 +203,17 @@
         }
         .channel-video .fire-label.show { display: block; }
 
+        .channel-video .pause-overlay {
+            display: none;
+            position: absolute; inset: 0;
+            background: rgba(0,0,0,0.55);
+            color: var(--text-dim);
+            font-size: 14px; font-weight: 500;
+            align-items: center; justify-content: center;
+            pointer-events: none;
+        }
+        .channel-video .pause-overlay.show { display: flex; }
+
         .channel-stats {
             display: flex; gap: 4px; padding: 8px 10px;
         }
@@ -332,6 +343,22 @@
             color: var(--text-primary);
         }
         .btn:hover { background: var(--glass-hover); }
+        .btn-mon {
+            min-width: 52px; padding: 4px 10px;
+            font-size: 11px; font-weight: 600;
+            border-radius: 5px; flex-shrink: 0;
+        }
+        .btn-mon.paused {
+            color: var(--green);
+            border-color: rgba(93,219,143,0.2);
+            background: rgba(93,219,143,0.06);
+        }
+        .btn-mon.running {
+            color: var(--blue);
+            border-color: rgba(100,168,255,0.3);
+            background: rgba(100,168,255,0.1);
+            box-shadow: 0 0 8px rgba(100,168,255,0.12);
+        }
         .btn-fire-on {
             color: #ff6b3a; border-color: rgba(255,107,58,0.2);
             background: rgba(255,107,58,0.06);
@@ -406,6 +433,20 @@
             .bottom-row { flex-direction: column; }
             .alarm-section { flex: auto; max-height: none; }
         }
+        @media (max-width: 680px) {
+            body { padding: 10px 8px; }
+            .top-bar { flex-direction: column; align-items: flex-start; gap: 8px; }
+            .top-bar h1 { font-size: 16px; }
+            .top-status { font-size: 12px; padding: 4px 12px; }
+            .channel-stats { flex-wrap: wrap; }
+            .ch-stat { flex: 0 0 calc(50% - 2px); }
+            .control-bar { font-size: 11px; gap: 6px; }
+            .recommend-panel { padding: 12px 14px; }
+            .recommend-panel.emergency { padding: 20px 16px; }
+            .recommend-panel.emergency .rec-title { font-size: 18px; }
+            .recommend-panel.emergency .rec-exit { font-size: 22px; padding: 10px 20px; }
+            .alarm-section { max-height: 240px; }
+        }
     </style>
 </head>
 <body>
@@ -452,6 +493,7 @@
             <button class="chart-toggle" id="chartToggle" onclick="toggleChart()" style="display:none;">▼ 折叠</button>
             <canvas id="trendChart"></canvas>
             <div class="chart-expand-hint" id="chartExpandHint">📊 折线图已折叠 · <a href="#" onclick="toggleChart();return false;">点击展开</a></div>
+            <div class="chart-empty-hint" id="chartEmptyHint" style="display:none;align-items:center;justify-content:center;padding:40px;color:var(--text-dim);font-size:13px;">📊 等待监测数据...</div>
         </div>
         <div class="alarm-section">
             <h3>报警事件记录</h3>
@@ -469,6 +511,7 @@
     let chartCollapsed = false;
     let isEmergency = false;
     const PAGE_OPEN_TIME = new Date().toISOString();
+    const channelActiveSince = { A: null, B: null, C: null };
     const DEFAULT_MJPEG_URL = "http://192.168.139.183:81/stream";
 
     // ── 加载 MP4 文件列表 ─────────────────────────
@@ -495,7 +538,7 @@
 
                     </div>
                     <div class="ch-status">
-                        <button class="btn" id="btnMon${ch}" onclick="toggleMonitoring('${ch}')" style="font-size:10px;padding:2px 8px;color:var(--green);border-color:rgba(93,219,143,0.2);background:rgba(93,219,143,0.06);flex-shrink:0;">▶</button>
+                        <button class="btn btn-mon paused" id="btnMon${ch}" onclick="toggleMonitoring('${ch}')">▶</button>
                         <span class="status-dot" id="dot${ch}"></span>
                         <span id="alarmLabel${ch}" style="font-size:11px;">正常</span>
                     </div>
@@ -514,6 +557,7 @@
                     <img id="video${ch}" src="/video_feed/${ch}" alt="通道 ${ch}">
                     <div class="fire-overlay" id="fireOverlay${ch}"></div>
                     <div class="fire-label" id="fireLabel${ch}">🔥 火灾</div>
+                    <div class="pause-overlay" id="pauseOverlay${ch}">⏸ 监测暂停</div>
                 </div>
                 <div class="channel-stats">
                     <div class="ch-stat">
@@ -664,6 +708,17 @@
                     // 监测按钮状态
                     const monBtn = document.getElementById('btnMon' + ch);
                     if (monBtn) updateMonButton(monBtn, cd.active);
+
+                    // 暂停蒙层 + 视频画面
+                    const pauseOverlay = document.getElementById('pauseOverlay' + ch);
+                    const videoImg = document.getElementById('video' + ch);
+                    if (pauseOverlay) {
+                        if (cd.active) {
+                            pauseOverlay.classList.remove('show');
+                        } else {
+                            pauseOverlay.classList.add('show');
+                        }
+                    }
 
                     // 阈值显示
                     const thWarn = document.getElementById('thWarn' + ch);
@@ -857,18 +912,60 @@
                     chart.update('none');
                 }
 
-                // 折线图（分通道历史）
+                // ── 折线图：动态数据集 + 统一时间轴 ──
                 const chHist = d.channel_history;
-                if (chHist && chHist.A) {
-                    chart.data.labels = chHist.A.map(r => {
-                        const t = r.timestamp.split('T')[1];
-                        return t ? t.substring(0, 5) : '';
+                const activeChannels = CHANNELS.filter(ch => d.channels[ch].active);
+                const canvas = document.getElementById('trendChart');
+                const emptyHint = document.getElementById('chartEmptyHint');
+
+                if (activeChannels.length === 0) {
+                    canvas.style.display = 'none';
+                    emptyHint.style.display = 'flex';
+                    chart.data.labels = [];
+                    chart.data.datasets = [];
+                    chart.update('none');
+                } else {
+                    canvas.style.display = '';
+                    emptyHint.style.display = 'none';
+
+                    // 收集所有活跃通道的时间戳（过滤本次激活前的旧数据）
+                    let allTimestamps = new Set();
+                    activeChannels.forEach(ch => {
+                        const hist = chHist[ch] || [];
+                        hist.forEach(r => {
+                            if (!channelActiveSince[ch] || r.timestamp >= channelActiveSince[ch]) {
+                                allTimestamps.add(r.timestamp);
+                            }
+                        });
                     });
-                    chart.data.datasets[0].data = chHist.A.map(r => r.count);
-                    chart.data.datasets[1].data = chHist.B ? chHist.B.map(r => r.count) : [];
-                    chart.data.datasets[2].data = chHist.C ? chHist.C.map(r => r.count) : [];
+                    const sortedTimestamps = [...allTimestamps].sort();
+
+                    // 动态构建 datasets（只含活跃通道）
+                    const datasets = activeChannels.map(ch => {
+                        const hist = chHist[ch] || [];
+                        const countMap = {};
+                        hist.forEach(r => {
+                            if (!channelActiveSince[ch] || r.timestamp >= channelActiveSince[ch]) {
+                                countMap[r.timestamp] = r.count;
+                            }
+                        });
+                        return {
+                            label: '出口' + ch,
+                            data: sortedTimestamps.map(t => countMap[t] ?? null),
+                            borderColor: CHART_COLORS[ch].border,
+                            backgroundColor: CHART_COLORS[ch].bg,
+                            fill: false, tension: 0.3, pointRadius: 0, borderWidth: 2,
+                            spanGaps: false,
+                        };
+                    });
+
+                    chart.data.labels = sortedTimestamps.map(t => {
+                        const parts = t.split('T')[1];
+                        return parts ? parts.substring(0, 5) : '';
+                    });
+                    chart.data.datasets = datasets;
+                    chart.update('none');
                 }
-                chart.update('none');
 
                 // 报警历史
                 const alarmRows = d.alarms;
@@ -968,8 +1065,11 @@
             if (d.status === 'ok') {
                 updateMonButton(btn, d.active);
                 if (d.active) {
+                    channelActiveSince[channel] = new Date().toISOString();
                     const img = document.getElementById('video' + channel);
                     img.src = '/video_feed/' + channel + '?t=' + Date.now();
+                } else {
+                    channelActiveSince[channel] = null;
                 }
             } else {
                 alert(d.message || '操作失败');
@@ -983,17 +1083,8 @@
     }
 
     function updateMonButton(btn, active) {
-        if (active) {
-            btn.textContent = '⏸';
-            btn.style.color = 'var(--amber)';
-            btn.style.borderColor = 'rgba(245,182,76,0.2)';
-            btn.style.background = 'rgba(245,182,76,0.06)';
-        } else {
-            btn.textContent = '▶';
-            btn.style.color = 'var(--green)';
-            btn.style.borderColor = 'rgba(93,219,143,0.2)';
-            btn.style.background = 'rgba(93,219,143,0.06)';
-        }
+        btn.textContent = active ? '⏸' : '▶';
+        btn.className = 'btn btn-mon ' + (active ? 'running' : 'paused');
     }
 
     // ── 折线图折叠切换 ────────────────────────────
