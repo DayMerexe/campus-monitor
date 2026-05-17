@@ -24,7 +24,7 @@ F:\bishe\
 │   ├── app.py               # Flask 入口，6 个 REST API 路由
 │   ├── detector.py          # HTTP 读 MJPEG + YOLOv8 推理 + TCP 广播
 │   ├── db.py                # SQLite 数据库层
-│   ├── tcp_server.py        # TCP Server (端口 8888)
+│   ├── communication.py     # MQTT + TCP 通信层
 │   ├── templates/index.html # Web 前端仪表盘
 │   └── data.db              # SQLite 数据库文件
 ├── stm32_serial_led/        # STM32F103ZET6 固件（Keil 项目）

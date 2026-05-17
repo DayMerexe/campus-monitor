@@ -38,7 +38,7 @@ STM32 → USART2 → ESP8266 → MQTT(bishe/99257/flame) → PC: "FLAME:1\n" / "
   - CCR1: 250=正转全速, 750=停止, 1250=反转全速, 持续1200ms
 - **火焰防抖**: 100ms 周期，3帧确认，防止误触发
 - **手动报警竞态修复**: 手动报警期间自动广播也发 ALARM:2，防止被 ALARM:0 覆盖
-- **`import tcp_server`**: 必须用模块引用而非 `from import`，否则 stm32_connected/flame_active 是值快照
+- **`import communication`**: 必须用模块引用而非 `from import`，否则 stm32_connected/flame_active 是值快照
 
 ---
 

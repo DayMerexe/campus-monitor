@@ -65,7 +65,7 @@
 | `app.py` | 全部 |
 | `db.py` | 全部 |
 | `index.html` | 全部 |
-| `tcp_server.py` | 全部 |
+| `communication.py` | 全部 |
 | `notify.py` | 全部 |
 | `main.c` | 全部 |
 

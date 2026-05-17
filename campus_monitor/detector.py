@@ -15,8 +15,8 @@ from datetime import datetime
 from ultralytics import YOLO
 
 from db import init_db, insert_detection, start_alarm, end_alarm
-from tcp_server import broadcast
-import tcp_server
+from communication import broadcast
+import communication
 from notify import alarm_notify, alarm_clear_notify
 
 # ── 配置 ──────────────────────────────────────────────
@@ -190,7 +190,7 @@ def coordinated_decision():
                 }
 
         # 绑定通道的 fire = 物理火焰传感器 OR 模拟按钮
-        snap[bound_ch]['fire'] = tcp_server.flame_active or snap[bound_ch]['fire']
+        snap[bound_ch]['fire'] = communication.flame_active or snap[bound_ch]['fire']
 
         # ── 联动决策（全局推荐，不受绑定影响）───
         safe = [ch for ch in CHANNELS if not snap[ch]['fire']]

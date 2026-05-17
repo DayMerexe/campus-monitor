@@ -40,13 +40,13 @@ def send_notification(title, markdown_text):
 def _get_channel_state():
     """读取三通道状态和联动决策（避免循环导入）"""
     import detector
-    import tcp_server
+    import communication
 
     channels = {}
     for ch in detector.CHANNELS:
         with detector.channel_locks[ch]:
             s = detector.channel_state[ch]
-            fire = tcp_server.flame_active if ch == detector.stm32_binding else s["fire"]
+            fire = communication.flame_active if ch == detector.stm32_binding else s["fire"]
             channels[ch] = {
                 "count": s["count"],
                 "level": s["alarm_level"],

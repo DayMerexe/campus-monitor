@@ -1,5 +1,28 @@
 # 进度日志
 
+## 2026-05-17 (#23) [后端] [硬件]
+
+**做了什么：** 多 STM32 MQTT 接入改造：通配符订阅 + devices 字典 + broadcast 遍历在线设备、ESP8266_MQTT_multi.ino（DEVICE_ID 宏 + topic 拼串）。保留 flame_active/stm32_connected 聚合属性向后兼容。TCP Server 已废弃，app.py 同步删除线程启动。
+
+**关键决策：**
+- 通配符订阅 `bishe/99257/+/status|flame` 自动发现新 STM32，新增设备无需改代码
+- `broadcast()` 向所有在线设备广播，未来多 STM32 场景需改用 `mqtt_send_to()` 定向发送
+- LWT 设 `bishe/99257/server/status`，各 ESP8266 自行维护 per-device 遗嘱
+
+**涉及文件：** `communication.py`（覆盖 v1）, `app.py`（删 TCP 线程）, `ESP8266_MQTT_multi.ino`, `docs/传输修复指南.md`
+
+**下一步：** 已合并
+
+---
+
+## 2026-05-17 (#22) [后端]
+
+**做了什么：** 重命名 tcp_server.py → communication.py，消除命名误导（文件含 MQTT + TCP，MQTT 才是主力通信）。同步更新全部 15+ 处 import 和 8 个文档文件引用。
+
+**涉及文件：** `communication.py`（原 tcp_server.py）, `detector.py`, `app.py`, `detector_fixed.py`, `app_fixed.py`, `notify.py`, `notify_fixed.py`, `docs/传输修复指南.md` 等
+
+**下一步：** 已合并（与 #23 一并 commit）
+
 ## 2026-05-17 (#21) [前端]
 
 **做了什么：** MJPEG 多摄像头支持：每通道下拉选 MJPEG 时显示 URL 输入框（预填默认 ESP32 IP），用户可修改为第二个 ESP32-CAM 的地址后回车确认，后端 `set_source` 已原生支持 `url` 参数无需改动。

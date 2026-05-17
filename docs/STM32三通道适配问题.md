@@ -139,7 +139,7 @@ if (sscanf(rx_buf, "LV:%d,BUZ:%d,SERVO:%d", &lv, &buz, &servo) == 3) {
 | `app.py` | `/video_feed` 连接去重、`/set_threshold/<channel>`、`/set_source/<channel>` |
 | `db.py` | 整个文件 |
 | `notify.py` | 钉钉推送逻辑（始终全局，不受绑定影响） |
-| `tcp_server.py` | MQTT 初始化和回调（topic 名不改） |
+| `communication.py` | MQTT 初始化和回调（topic 名不改） |
 | `main.c` | 火焰传感器防抖逻辑、舵机 PWM 控制、时钟配置 |
 
 ---

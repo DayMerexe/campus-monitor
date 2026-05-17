@@ -5,7 +5,7 @@
 
 ## 当前状态
 _更新于 2026-05-17_
-- [软件]: v7.1 功能完整（火焰传感器去硬编码 + 手动报警修复 + 火焰按钮动态化），15 API 路由，三通道联动正常
+- [软件]: v8 功能完整（多摄像头 MJPEG URL 输入 + 火焰传感器绑定 + 手动报警修复），15 API 路由，三通道联动正常
 - [AI]: YOLO 训练 3330 张数据集就绪，仅跑 1/50 epoch → 需重跑完整训练（batch=8）
 - [硬件]: STM32 + 火焰传感器 + 舵机 + 蜂鸣器全部验证通过，ESP32-CAM 待接入测试
 
@@ -48,6 +48,7 @@ Python: Flask, PyTorch, YOLOv8, OpenCV, paho-mqtt | Arduino: ESP8266WiFi, PubSub
 | [传输问题](docs/数据传输问题总结.md) | HTTP/MQTT/DB 传输汇总（子对话B入口） |
 | [多场景改造](docs/多场景模拟改造.md) | 三通道联动模拟（子对话入口） |
 | [STM32适配](docs/STM32三通道适配问题.md) | STM32 手动绑定 + 协议适配（子对话入口） |
+| [多摄像头](docs/MJPEG多摄像头支持.md) | v8 MJPEG URL 输入框，支持多 ESP32-CAM 接入 |
 | [应急模式](docs/仪表盘应急模式.md) | 仪表盘正常/紧急双态切换（子对话入口） |
 | [进度日志](docs/PROGRESS.md) | 完整开发进度 |
 | [硬件引脚](docs/hardware.md) | STM32 引脚定义 |

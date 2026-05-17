@@ -107,7 +107,7 @@ ESP32-CAM ← WiFi → PC ← TCP → ESP8266 ← UART → STM32
 | app.py | Flask 入口，6 个 REST API 路由 |
 | detector.py | HTTP 直读 MJPEG + YOLOv8 推理 + TCP 广播 + DB 写入 |
 | db.py | SQLite 数据库层（检测记录 + 报警事件两张表） |
-| tcp_server.py | TCP Server 监听 8888 端口，管理客户端列表 |
+| communication.py | TCP Server 监听 8888 端口，管理客户端列表 |
 
 **Web 前端**（templates/index.html）：
 - Chart.js 折线图实时展示人数变化趋势
