@@ -1,5 +1,24 @@
 # 进度日志
 
+## 2026-05-17 (#27) [后端] [修复]
+
+**做了什么：** MJPEG 读帧修复 — 分支 `feature/mjpeg-read-fix`。之前 `feature/mjpeg-persistent-connection` (#8) 合并后线上报 "[MJPEG] 未收到有效 JPEG 帧"。排查发现 3 个 bug：
+1. `_open_source` 探针 GET→close 占用了 ESP32-CAM 唯一 MJPEG 槽位，导致后续连接被拒
+2. `_mjpeg_streams` 全局共享，多线程同读一个连接数据交叉
+3. `iter_content()` 生成器 GC 可能关闭底层连接
+
+**修复方案：**
+- 删除探针连接，直接返回 URL
+- `_mjpeg_streams` key 改为 `(url, thread_id)` per-thread
+- `r.raw.read()` 替代 `iter_content()` + 新增 `Exception` 全量捕获
+- 清理已失效的 `mjpeg_unreachable` 分支
+
+**涉及文件：** `detector.py`（+25/-27 行）, `docs/传输修复指南.md`
+
+**下一步：** 审查 → 合并 `feature/mjpeg-read-fix`
+
+---
+
 ## 2026-05-17 (#24) [后端] [前端]
 
 **做了什么：** 多 STM32 设备绑定改造：`stm32_binding` 单值 → `device_bindings` 字典，每设备独立 LV:BUZ:SERVO 指令，per-device MQTT 节流。前端从固定三按钮改为动态设备列表+通道下拉。火焰模拟按钮按 `bound_device` 显隐。
