@@ -289,19 +289,42 @@ def coordinated_decision():
             communication.mqtt_send_to(dev_id, msg + '\n')
 
 
-# ── 通道 A: MJPEG 读取器 ─────────────────────────────
+# ── MJPEG 持久连接缓存 ────────────────────────────────
+_mjpeg_streams = {}      # {url: requests.Response}  复用连接，避免每帧新建 TCP
+_mjpeg_streams_lock = threading.Lock()
+
+
+def _close_mjpeg(url):
+    """关闭指定 URL 的 MJPEG 持久连接"""
+    with _mjpeg_streams_lock:
+        r = _mjpeg_streams.pop(url, None)
+    if r is not None:
+        try:
+            r.close()
+        except Exception:
+            pass
+
+
+# ── MJPEG 读取器 ─────────────────────────────────────
 def _read_mjpeg(url=None):
-    """从 MJPEG 流读取一帧。返回 frame (numpy array) 或 None"""
+    """从 MJPEG 流读取一帧（持久连接）。返回 frame (numpy array) 或 None"""
     if url is None:
         url = ESP32_CAM_URL
-    try:
-        r = requests.get(url, stream=True, timeout=(3, 5))
-        if r.status_code != 200:
-            print(f"[MJPEG] HTTP {r.status_code} from {url}")
+
+    # ── 复用已有连接，没有则新建 ──────────────
+    with _mjpeg_streams_lock:
+        r = _mjpeg_streams.get(url)
+    if r is None:
+        try:
+            r = requests.get(url, stream=True, timeout=(3, 5))
+            if r.status_code != 200:
+                print(f"[MJPEG] HTTP {r.status_code} from {url}")
+                return None
+        except Exception as e:
+            print(f"[MJPEG] 连接失败 {url}: {e}")
             return None
-    except Exception as e:
-        print(f"[MJPEG] 连接失败 {url}: {e}")
-        return None
+        with _mjpeg_streams_lock:
+            _mjpeg_streams[url] = r
 
     buf = b''
     try:
@@ -326,13 +349,11 @@ def _read_mjpeg(url=None):
             if frame is not None:
                 return frame
     except (requests.ConnectionError, requests.Timeout) as e:
-        print(f"[MJPEG] 流读取中断: {e}")
-    finally:
-        try:
-            r.close()
-        except Exception:
-            pass
-    print(f"[MJPEG] 未收到有效 JPEG 帧")
+        print(f"[MJPEG] 流读取中断 {url}: {e}")
+        _close_mjpeg(url)
+    print(f"[MJPEG] 未收到有效 JPEG 帧 {url}")
+    _close_mjpeg(url)
+    return None
 
 
 # ── 通道读取 ─────────────────────────────────────────
@@ -471,8 +492,10 @@ def detect_loop(channel):
             cur_cfg = dict(source_config[channel])
         if cur_cfg != last_source_cfg:
             last_source_cfg = cur_cfg
-            # 关闭旧源
-            if source is not None and isinstance(source, cv2.VideoCapture):
+            # 关闭旧源（MP4/MJPEG）
+            if isinstance(source, tuple) and source[0] == 'mjpeg':
+                _close_mjpeg(source[1])
+            elif isinstance(source, cv2.VideoCapture):
                 source.release()
                 with _active_video_lock:
                     _active_video_path.pop(channel, None)
