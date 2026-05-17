@@ -928,12 +928,13 @@
                     canvas.style.display = '';
                     emptyHint.style.display = 'none';
 
-                    // 收集所有活跃通道的时间戳，按秒取整对齐多通道数据
+                    // 收集活跃通道时间戳，只保留 monitoring_start 之后的数据
                     let allTimestamps = new Set();
                     activeChannels.forEach(ch => {
                         const hist = chHist[ch] || [];
+                        const msStart = d.channels[ch].monitoring_start;
                         hist.forEach(r => {
-                            // 截断毫秒部分，让秒级对齐
+                            if (msStart && r.timestamp < msStart) return;
                             const t = r.timestamp.split('.')[0];
                             allTimestamps.add(t);
                         });
@@ -943,10 +944,11 @@
                     // 动态构建 datasets（只含活跃通道）
                     const datasets = activeChannels.map(ch => {
                         const hist = chHist[ch] || [];
+                        const msStart = d.channels[ch].monitoring_start;
                         const countMap = {};
                         hist.forEach(r => {
+                            if (msStart && r.timestamp < msStart) return;
                             const t = r.timestamp.split('.')[0];
-                            // 同一秒取最新值
                             countMap[t] = r.count;
                         });
                         return {
@@ -1153,7 +1155,7 @@
         });
     }
 
-    setInterval(updateDashboard, 3000);
+    setInterval(updateDashboard, 1000);
     setTimeout(updateDashboard, 500);
 </script>
 </body>

@@ -4,6 +4,7 @@
 import threading
 import time
 import os
+from datetime import datetime
 from flask import Flask, render_template, Response, jsonify, request
 
 from db import init_db, get_recent_records, get_alarm_events, get_today_stats, get_channel_history
@@ -94,6 +95,7 @@ def dashboard():
                 'active_source': os.path.basename(vpath) if vpath else None,
                 'source_type': scfg.get('type'),
                 'source_url': scfg.get('url'),
+                'monitoring_start': s.get('monitoring_start'),
             }
 
     stats = get_today_stats()
@@ -283,6 +285,8 @@ def toggle_monitoring(channel):
                         }), 409
         with detector.channel_active_lock:
             detector.channel_active[channel] = activating
+        with detector.channel_locks[channel]:
+            detector.channel_state[channel]['monitoring_start'] = datetime.now().isoformat() if activating else None
         state = '启动' if detector.channel_active[channel] else '暂停'
         print(f"[通道 {channel}] 监测{state}")
         return jsonify({'status': 'ok', 'channel': channel, 'active': detector.channel_active[channel]})

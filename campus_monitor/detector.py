@@ -47,6 +47,7 @@ for ch in CHANNELS:
         'consecutive': 0,
         'normal_frames': 0,
         'last_state_change': 0.0,
+        'monitoring_start': None,  # ISO时间戳，通道激活时设置，用于前端过滤旧数据
     }
     channel_locks[ch] = threading.Lock()
 
