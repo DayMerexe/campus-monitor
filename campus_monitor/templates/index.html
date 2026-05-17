@@ -846,6 +846,10 @@
                 }
 
                 // ── 通道边框强化 ──
+                const recExitObj = rec.exit || {};
+                const recExits = recExitObj.exits || [];
+                const recStrategy = recExitObj.strategy || 'all_clear';
+
                 CHANNELS.forEach((ch, i) => {
                     const col = document.querySelectorAll('.channel-col')[i];
                     const cd = d.channels[ch];
@@ -854,14 +858,14 @@
                         if (emergency) {
                             if (cd.fire || cd.alarm_level >= 2) {
                                 col.classList.add('fire-danger');
-                            } else if (rec.exit && ch === rec.exit) {
+                            } else if (recExits.includes(ch)) {
                                 col.classList.add('safe-exit');
                             }
                         }
                     }
                 });
 
-                // ── 推荐面板双态 ──
+                // ── 推荐面板（四策略：all_clear / guided / degraded / emergency）──
                 panel.className = 'recommend-panel';
                 recExit.style.display = 'none';
 
@@ -872,23 +876,41 @@
                         recIcon.textContent = '🚫';
                         recTitle.textContent = '所有通道危险！请立即远离该区域';
                         recDetail.textContent = '全部通道发生火灾，无安全出口';
-                    } else if (rec.exit) {
+                    } else if (recExits.length > 0) {
                         panel.classList.add('safe-exit');
                         recIcon.textContent = '✅';
                         recTitle.textContent = '紧急疏散指引';
-                        recDetail.textContent = `检测到危险通道，请从 ${CH_NAMES[rec.exit]} 有序撤离`;
+                        const names = recExits.map(ch => CH_NAMES[ch]).join('、');
+                        recDetail.textContent = '检测到危险通道，请从 ' + names + ' 有序撤离';
                         recExit.style.display = 'block';
-                        recExit.textContent = '→ ' + CH_NAMES[rec.exit] + ' 安全撤离';
+                        recExit.textContent = '→ ' + names + ' 安全撤离';
+                    } else {
+                        panel.classList.add('all-danger');
+                        recIcon.textContent = '⚠️';
+                        recTitle.textContent = recExitObj.message || '紧急状态';
+                        recDetail.textContent = '请等待进一步指示';
                     }
                 } else {
-                    if (rec.exit) {
+                    if (recStrategy === 'guided' && recExits.length > 0) {
                         if (anyRed) panel.classList.add('danger');
+                        else panel.classList.add('safe');
                         recIcon.textContent = '⭐';
                         recTitle.textContent = '联动疏散建议';
-                        recDetail.textContent = `检测到拥挤或危险通道，建议人员从 ${CH_NAMES[rec.exit]} 疏散`;
+                        const names = recExits.map(ch => CH_NAMES[ch]).join('、');
+                        recDetail.textContent = '建议人员从 ' + names + ' 疏散';
                         recExit.style.display = 'block';
-                        recExit.textContent = '→ ' + CH_NAMES[rec.exit];
+                        recExit.textContent = '→ ' + names;
                         recExit.className = 'rec-exit';
+                    } else if (recStrategy === 'degraded') {
+                        panel.classList.add('danger');
+                        recIcon.textContent = '⚠️';
+                        recTitle.textContent = '分批通行提示';
+                        recDetail.textContent = recExitObj.message || '各通道接近容量上限，请分批通行';
+                        if (recExits.length > 0) {
+                            recExit.style.display = 'block';
+                            recExit.textContent = '→ ' + recExits.map(ch => CH_NAMES[ch]).join('、');
+                            recExit.className = 'rec-exit';
+                        }
                     } else {
                         panel.classList.add('safe');
                         recIcon.textContent = '🟢';

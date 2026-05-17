@@ -61,7 +61,12 @@ for ch in CHANNELS:
 
 # ── 联动决策全局输出 ─────────────────────────────────
 coord_lock = threading.Lock()
-recommended_exit = None
+recommended_exit = {
+    'exits': [],
+    'strategy': 'all_clear',
+    'saturations': {},
+    'message': '',
+}
 servo_open = False
 buzzer_on = False
 manual_alarm_active = False
@@ -213,6 +218,9 @@ def coordinated_decision():
                     'count': s['count'] if ch_active else 0,
                     'alarm_level': s['alarm_level'] if ch_active else 0,
                     'fire': s['fire'],
+                    'active': ch_active,
+                    'threshold_warn': s['threshold_warn'],
+                    'threshold_red': s['threshold_red'],
                 }
 
         # ── 每通道 fire 来自其绑定设备的物理传感器 ──
@@ -224,11 +232,56 @@ def coordinated_decision():
                 snap[ch]['fire'] = True
 
         # ── 联动推荐（全局）───
-        safe = [ch for ch in CHANNELS if not snap[ch]['fire']]
-        if safe:
-            recommended_exit = min(safe, key=lambda ch: snap[ch]['count'])
+        # 饱和度 = count / threshold_warn，用于排序和判定
+        active_list = [ch for ch in CHANNELS if snap[ch]['active']]
+        fire_channels = [ch for ch in active_list if snap[ch]['fire']]
+        safe_active = [ch for ch in active_list if not snap[ch]['fire']]
+
+        if not active_list:
+            recommended_exit = {
+                'exits': [], 'strategy': 'all_clear',
+                'saturations': {}, 'message': '无活跃监测通道',
+            }
+        elif not safe_active:
+            recommended_exit = {
+                'exits': [], 'strategy': 'emergency',
+                'saturations': {}, 'message': '所有通道发生火灾！请立即远离该区域',
+            }
         else:
-            recommended_exit = None
+            sat = {}
+            for ch in safe_active:
+                tw = max(snap[ch]['threshold_warn'], 1)
+                sat[ch] = snap[ch]['count'] / tw
+
+            clear_chs = [ch for ch in safe_active
+                         if snap[ch]['alarm_level'] == 0 and sat[ch] < 0.8]
+            crowded_chs = [ch for ch in safe_active
+                          if snap[ch]['alarm_level'] > 0 or sat[ch] >= 0.8]
+
+            if not crowded_chs:
+                recommended_exit = {
+                    'exits': [], 'strategy': 'all_clear',
+                    'saturations': sat, 'message': '各通道畅通，无需引导',
+                }
+            elif clear_chs:
+                exits = sorted(clear_chs, key=lambda ch: sat[ch])
+                names = '、'.join(CHANNEL_NAMES.get(e, e) for e in exits)
+                recommended_exit = {
+                    'exits': exits, 'strategy': 'guided',
+                    'saturations': sat, 'message': f'建议人员前往：{names}',
+                }
+            else:
+                exits = sorted(safe_active, key=lambda ch: sat[ch])
+                recommended_exit = {
+                    'exits': exits, 'strategy': 'degraded',
+                    'saturations': sat,
+                    'message': '各通道接近容量上限，请分批通行',
+                }
+
+        # ── 回写每通道 fire 状态（供 notify.py 读取）──
+        for ch in CHANNELS:
+            with channel_locks[ch]:
+                channel_state[ch]['fire'] = snap[ch]['fire']
 
         # ── 每设备独立 STM32 指令 ──
         # 无显式绑定时，自动将首个在线设备绑到默认通道（向后兼容）
@@ -264,11 +317,13 @@ def coordinated_decision():
         # ── 向后兼容 ──
         _sync_stm32_binding()
 
-        # ── SIG 消息（仪表盘用，去掉 BIND 字段）──
+        # ── SIG 消息（仪表盘用）──
+        exits_csv = ','.join(recommended_exit['exits']) if recommended_exit['exits'] else 'X'
         sig = f"A:{snap['A']['count']},LA:{snap['A']['alarm_level']}," \
               f"B:{snap['B']['count']},LB:{snap['B']['alarm_level']}," \
               f"C:{snap['C']['count']},LC:{snap['C']['alarm_level']}," \
-              f"REC:{recommended_exit or 'X'}," \
+              f"REC:{exits_csv}," \
+              f"STR:{recommended_exit['strategy']}," \
               f"FIRE_A:{1 if snap['A']['fire'] else 0}," \
               f"FIRE_B:{1 if snap['B']['fire'] else 0}," \
               f"FIRE_C:{1 if snap['C']['fire'] else 0}"

@@ -85,20 +85,20 @@ def send_notification(title, markdown_text):
 def _get_channel_state():
     """读取三通道状态和联动决策（避免循环导入）"""
     import detector
-    import communication
 
     channels = {}
     for ch in detector.CHANNELS:
         with detector.channel_locks[ch]:
             s = detector.channel_state[ch]
-            fire = communication.flame_active if ch == detector.stm32_binding else s["fire"]
             channels[ch] = {
                 "count": s["count"],
                 "level": s["alarm_level"],
-                "fire": fire,
+                "fire": s["fire"],
+                "active": detector.channel_active.get(ch, False),
+                "threshold_warn": s["threshold_warn"],
             }
 
-    rec = detector.recommended_exit
+    rec = detector.recommended_exit  # 现在是 dict
     fire_list = [ch for ch in detector.CHANNELS if channels[ch]["fire"]]
     return channels, rec, fire_list
 
@@ -125,14 +125,25 @@ def alarm_notify(channel, level, count):
         header = f"**⚠️ {name} 人流接近阈值**\n当前 **{count}** 人\n\n"
 
     # 引导行
-    if rec and rec != channel:
-        rec_name = CHANNEL_NAMES.get(rec, rec)
-        header += f"➡️ **请引导人员前往 {rec_name}**\n"
-        if channels and rec in channels:
-            header += f"（当前 {channels[rec]['count']} 人，较为通畅）\n"
+    rec_exits = rec.get('exits', []) if isinstance(rec, dict) else []
+    rec_strategy = rec.get('strategy', 'all_clear') if isinstance(rec, dict) else 'all_clear'
+    rec_sats = rec.get('saturations', {}) if isinstance(rec, dict) else {}
+
+    if rec_strategy == 'emergency':
+        header += "🚨 **所有通道均不安全，请立即组织疏散！**\n\n"
+    elif rec_strategy == 'degraded':
+        exit_names = '、'.join(CHANNEL_NAMES.get(e, e) for e in rec_exits)
+        header += f"⚠️ **各通道接近容量上限**\n"
+        header += f"➡️ 请分批通行，优先选择：{exit_names}\n\n"
+    elif rec_strategy == 'guided' and rec_exits:
+        exit_names = '、'.join(CHANNEL_NAMES.get(e, e) for e in rec_exits)
+        header += f"➡️ **请引导人员前往：{exit_names}**\n"
+        for e in rec_exits:
+            if e in channels:
+                pct = int(rec_sats.get(e, 0) * 100)
+                header += f"  · {CHANNEL_NAMES.get(e, e)}：{channels[e]['count']}人（{pct}%）\n"
         header += "\n"
-    elif not rec and fire_list:
-        header += "🚨 **所有出口均不安全，请立即组织疏散！**\n\n"
+    # all_clear 不输出引导行
 
     # 三通道概览
     if channels:
@@ -149,7 +160,8 @@ def alarm_notify(channel, level, count):
                 else:
                     icon = "🟢"
                 mark = " ← 此处" if ch == channel else ""
-                lines.append(f"{icon} {CHANNEL_NAMES.get(ch, ch)}：{s['count']}人{mark}")
+                sat_str = f"（{int(rec_sats.get(ch, 0) * 100)}%）" if ch in rec_sats else ""
+                lines.append(f"{icon} {CHANNEL_NAMES.get(ch, ch)}：{s['count']}人{sat_str}{mark}")
         header += "\n".join(lines)
 
     send_notification(
@@ -163,15 +175,15 @@ def alarm_clear_notify(channel, peak):
     global _last_clear_time
 
     try:
-        channels, _, _ = _get_channel_state()
+        channels, rec, _ = _get_channel_state()
         any_alarm = any(
             channels[ch]["level"] > 0 for ch in channels
         ) if channels else False
     except Exception:
         any_alarm = False
+        channels, rec = None, {}
 
     if any_alarm:
-        # 仍有其他通道在报警，不发消息
         print(f"📱 钉钉静默: {channel} 恢复，其他通道仍在报警，不发送")
         return
 
@@ -183,8 +195,22 @@ def alarm_clear_notify(channel, peak):
     _last_clear_time = now
 
     name = CHANNEL_NAMES.get(channel, channel)
-    send_notification(
-        "✅ 全部恢复",
-        f"**{name}** 报警已解除（期间峰值 **{peak}** 人）\n\n"
-        "所有通道恢复正常通行",
-    )
+    body = f"**{name}** 报警已解除（期间峰值 **{peak}** 人）\n\n"
+
+    if channels:
+        body += "**当前各出口状态：**\n"
+        for ch in ["A", "B", "C"]:
+            if ch in channels:
+                s = channels[ch]
+                icon = "🟢" if s["level"] == 0 else "⚠️" if s["level"] == 1 else "🔴"
+                body += f"{icon} {CHANNEL_NAMES.get(ch, ch)}：{s['count']}人\n"
+        body += "\n"
+
+    rec_msg = rec.get('message', '') if isinstance(rec, dict) else ''
+    rec_strategy = rec.get('strategy', 'all_clear') if isinstance(rec, dict) else 'all_clear'
+    if rec_strategy != 'all_clear' and rec_msg:
+        body += f"💡 {rec_msg}\n\n"
+    else:
+        body += "所有通道恢复正常通行\n"
+
+    send_notification("✅ 全部恢复", body)
