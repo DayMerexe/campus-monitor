@@ -633,7 +633,7 @@ def detect_loop(channel):
 
         # ── DB 写入（每通道每 2s）─────────────────
         now2 = time.time()
-        if now2 - last_db_write >= 2.0:
+        if now2 - last_db_write >= 1.0:
             try:
                 insert_detection(count, st['alarm_level'], round(st['fps'], 1), channel)
             except Exception as e:

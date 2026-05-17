@@ -512,7 +512,6 @@
     let chartCollapsed = false;
     let isEmergency = false;
     const PAGE_OPEN_TIME = new Date().toISOString();
-    const channelActiveSince = { A: null, B: null, C: null };
     const DEFAULT_MJPEG_URL = "http://192.168.139.183:81/stream";
 
     // ── 加载 MP4 文件列表 ─────────────────────────
@@ -913,7 +912,7 @@
                     chart.update('none');
                 }
 
-                // ── 折线图：动态数据集 + 统一时间轴 ──
+                // ── 折线图：动态数据集 + 秒对齐统一时间轴 ──
                 const chHist = d.channel_history;
                 const activeChannels = CHANNELS.filter(ch => d.channels[ch].active);
                 const canvas = document.getElementById('trendChart');
@@ -929,14 +928,14 @@
                     canvas.style.display = '';
                     emptyHint.style.display = 'none';
 
-                    // 收集所有活跃通道的时间戳（过滤本次激活前的旧数据）
+                    // 收集所有活跃通道的时间戳，按秒取整对齐多通道数据
                     let allTimestamps = new Set();
                     activeChannels.forEach(ch => {
                         const hist = chHist[ch] || [];
                         hist.forEach(r => {
-                            if (!channelActiveSince[ch] || r.timestamp >= channelActiveSince[ch]) {
-                                allTimestamps.add(r.timestamp);
-                            }
+                            // 截断毫秒部分，让秒级对齐
+                            const t = r.timestamp.split('.')[0];
+                            allTimestamps.add(t);
                         });
                     });
                     const sortedTimestamps = [...allTimestamps].sort();
@@ -946,9 +945,9 @@
                         const hist = chHist[ch] || [];
                         const countMap = {};
                         hist.forEach(r => {
-                            if (!channelActiveSince[ch] || r.timestamp >= channelActiveSince[ch]) {
-                                countMap[r.timestamp] = r.count;
-                            }
+                            const t = r.timestamp.split('.')[0];
+                            // 同一秒取最新值
+                            countMap[t] = r.count;
                         });
                         return {
                             label: '出口' + ch,
@@ -956,7 +955,7 @@
                             borderColor: CHART_COLORS[ch].border,
                             backgroundColor: CHART_COLORS[ch].bg,
                             fill: false, tension: 0.3, pointRadius: 0, borderWidth: 2,
-                            spanGaps: false,
+                            spanGaps: true,
                         };
                     });
 
@@ -1066,11 +1065,8 @@
             if (d.status === 'ok') {
                 updateMonButton(btn, d.active);
                 if (d.active) {
-                    channelActiveSince[channel] = new Date().toISOString();
                     const img = document.getElementById('video' + channel);
                     img.src = '/video_feed/' + channel + '?t=' + Date.now();
-                } else {
-                    channelActiveSince[channel] = null;
                 }
             } else {
                 alert(d.message || '操作失败');
