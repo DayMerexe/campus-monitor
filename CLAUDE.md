@@ -5,8 +5,8 @@
 
 ## 当前状态
 _更新于 2026-05-17_
-- [软件]: v9 功能完整，15 API 路由，三通道联动 + MJPEG 持久连接正常。项目大清理完成（删除 ~110 万行死代码/废弃固件）
-- [优化]: 下一阶段启动 — 前端+折线图、引导算法+钉钉通知、数据库优化，三个入口文档已就绪
+- [软件]: v9 功能完整，前端+折线图、引导算法+钉钉通知两个优化模块已完成合并。系统功能终态确认（详见 docs/系统功能总结.md）
+- [决策]: 数据库优化明确跳过（毕设演示场景数据量小，SQLite 无需优化）
 - [AI]: YOLO 训练 3330 张数据集就绪，仅跑 1/50 epoch → 需重跑完整训练（batch=8）
 - [硬件]: STM32 + 火焰传感器 + 舵机 + 蜂鸣器 + ESP8266 MQTT + ESP32-CAM 全部验证通过
 
@@ -14,7 +14,7 @@ _更新于 2026-05-17_
 `cd F:\bishe\campus_monitor && /c/Users/DayMer/miniconda3/python.exe app.py` → http://localhost:5000
 
 ## 项目结构
-`campus_monitor/` (主版本) | `Arduino_camera/` (ESP32/ESP8266) | `stm32_serial_led/` (STM32) | `ppt-slides/` (PPT)
+`campus_monitor/` (主版本) | `Arduino_camera/` (ESP32/ESP8266) | `stm32_serial_led/` (STM32)
 
 ## 协作流程
 - **主对话**：架构决策 + diff 审查 + 合并执行 + 进度管理
@@ -29,9 +29,6 @@ _更新于 2026-05-17_
 - 三级报警+火焰防抖，详见 docs/architecture.md
 
 ## 待办事项
-- [ ] 前端与折线图优化（入口: docs/前端与折线图.md）
-- [ ] 人流引导算法 + 钉钉通知内容优化（入口: docs/引导算法与通知.md）
-- [ ] 数据库优化（入口: docs/数据库优化.md）
 - [ ] YOLO 模型自训练（重跑完整 50 epoch）
 - [ ] 终期答辩 PPT + 演示流程
 - [ ] 论文
@@ -48,7 +45,7 @@ Python: Flask, PyTorch, YOLOv8, OpenCV, paho-mqtt | Arduino: ESP8266WiFi, PubSub
 | [协作流程](docs/协作流程.md) | 多对话并行协作规范 |
 | [前端与折线图](docs/前端与折线图.md) | 前端UI优化+折线图重设计（子对话入口） |
 | [引导算法与通知](docs/引导算法与通知.md) | 人流引导算法+钉钉通知内容（子对话入口） |
-| [数据库优化](docs/数据库优化.md) | DB 重构：日期分类、索引、聚合、清理（子对话入口） |
+| [系统功能总结](docs/系统功能总结.md) | 8 模块概述 + 全开发时间线 + 28 问题&方案 + 硬件清单 |
 | [系统架构](docs/architecture.md) | 通信协议、三级报警、实现细节 |
 | [传输修复指南](docs/传输修复指南.md) | 修复清单 + 合并步骤 |
 | [进度日志](docs/PROGRESS.md) | 完整开发进度 |
