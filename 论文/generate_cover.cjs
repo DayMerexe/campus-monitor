@@ -120,24 +120,51 @@ const declChildren = [
   rightSig("                    年    月    日"),
 ];
 
-// Authorization page
-const authChildren = [
+// 扉页 (title page)
+const titlePageChildren = [
+  emptyPara(), emptyPara(), emptyPara(), emptyPara(),
+  new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 0, after: 600, line: 360 },
+    children: [new TextRun({ text: "应急场景下的校园人流量", size: pt(22), bold: true, font: fontHei })]
+  }),
+  new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 0, after: 600, line: 360 },
+    children: [new TextRun({ text: "监控管理系统", size: pt(22), bold: true, font: fontHei })]
+  }),
   emptyPara(), emptyPara(),
   new Paragraph({
     alignment: AlignmentType.CENTER,
-    spacing: { before: 0, after: 400 },
-    children: [new TextRun({ text: "毕业设计（论文）版权使用授权书", size: pt(15), bold: true, font: fontHei })]
+    spacing: { before: 0, after: 200, line: 360 },
+    children: [new TextRun({ text: "学    院：计算机学院", size: pt(14), font: fontSong })]
   }),
-  emptyPara(), emptyPara(),
-  bodyPara("本人完全了解应急管理大学有关保留、使用毕业设计（论文）的规定，同意学校有权向国家有关部门或机构送交毕业设计（论文）的复印件和磁盘，允许毕业设计（论文）被查阅和借阅。本人授权应急管理大学可以将毕业设计（论文）的全部或部分内容编入有关数据库进行检索，可以采用影印、缩印或扫描等复制手段保存、汇编毕业设计（论文）。"),
-  emptyPara(), emptyPara(), emptyPara(), emptyPara(), emptyPara(),
-  rightSig("毕业设计（论文）作者（签名）：______________"),
-  emptyPara(),
-  rightSig("                    年    月    日"),
-  emptyPara(), emptyPara(),
-  rightSig("指导教师（签名）：______________"),
-  emptyPara(),
-  rightSig("                    年    月    日"),
+  new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 0, after: 200, line: 360 },
+    children: [new TextRun({ text: "专    业：", size: pt(14), font: fontSong })]
+  }),
+  new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 0, after: 200, line: 360 },
+    children: [new TextRun({ text: "姓    名：", size: pt(14), font: fontSong })]
+  }),
+  new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 0, after: 200, line: 360 },
+    children: [new TextRun({ text: "学    号：", size: pt(14), font: fontSong })]
+  }),
+  new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 0, after: 200, line: 360 },
+    children: [new TextRun({ text: "指导教师：", size: pt(14), font: fontSong })]
+  }),
+  emptyPara(), emptyPara(), emptyPara(),
+  new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 0, after: 0 },
+    children: [new TextRun({ text: "2026年5月", size: pt(14), font: fontSong })]
+  }),
 ];
 
 // Helpers
@@ -167,13 +194,14 @@ const doc = new Document({
       properties: { page: { size: { width: A4_W, height: A4_H }, margin: { top: 1200, bottom: 1200, left: MARGIN, right: MARGIN } } },
       children: coverChildren
     },
+    // 扉页
     {
       properties: { page: { size: { width: A4_W, height: A4_H }, margin: { top: 2000, bottom: 1440, left: MARGIN, right: MARGIN } } },
-      children: declChildren
+      children: titlePageChildren
     },
     {
       properties: { page: { size: { width: A4_W, height: A4_H }, margin: { top: 2000, bottom: 1440, left: MARGIN, right: MARGIN } } },
-      children: authChildren
+      children: declChildren
     },
   ]
 });
