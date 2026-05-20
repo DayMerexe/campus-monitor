@@ -77,7 +77,7 @@ function buildInfoTable() {
             ...label.split("").map(c => new TextRun({ text: c, size: pt(16), bold: true, font: fontHei }))
           ]})]
         }),
-        // Value cell — 仿宋 三号 with underline
+        // Value cell — Times New Roman 三号，模板要求
         new TableCell({
           width: { size: 3200, type: WidthType.DXA },
           borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.SINGLE, size: 1, color: "000000" },
@@ -85,7 +85,7 @@ function buildInfoTable() {
           verticalAlign: "center",
           margins: { top: 60, bottom: 60, left: 80, right: 80 },
           children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [
-            new TextRun({ text: placeholder, size: pt(16), font: fontFang })
+            new TextRun({ text: placeholder, size: pt(16), font: "Times New Roman" })
           ]})]
         }),
       ]
