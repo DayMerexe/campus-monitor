@@ -6,7 +6,17 @@
 
 **涉及文件：** `detector.py`, `app.py`, `templates/index.html`
 
-**下一步：** 第二块 STM32 实物接入测试
+**下一步：** 第二块 STM32 实物接入测试（待换板）
+
+---
+
+## 2026-05-20 (#43) [硬件] ESP8266 固件修复 — RX 悬空防阻塞
+
+**做了什么：** `Serial.setTimeout(50)` 防止未接 STM32 时 RX 脚悬空噪声触发 `readStringUntil('\n')` 默认 1s 超时阻塞主循环，导致 LED 闪烁异常。
+
+**涉及文件：** `ESP8266_MQTT_multi.ino`
+
+**下一步：** 换板后多设备接入测试
 
 ---
 
