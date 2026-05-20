@@ -204,7 +204,6 @@ def _fix_merged_styles(doc):
         hs = doc.styles[name]
         hs.font.name = FONT_HEI
         hs.font.size = Pt(int(spec['sz']) / 2)
-        hs.font.bold = True
         hs.font.color.rgb = None  # reset (removes blue)
         hs.paragraph_format.line_spacing = Pt(LINE_SPACING_PT)
         hs.paragraph_format.space_before = Pt(int(spec['before']) / 20)

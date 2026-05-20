@@ -172,7 +172,7 @@ def add_heading_styled(doc, text, level):
         size = 12
 
     run = p.add_run(text)
-    set_font(run, FONT_HEI, size, bold=True, color='000000')
+    set_font(run, FONT_HEI, size, color='000000')
     return p
 
 
@@ -183,7 +183,7 @@ def add_toc(doc):
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     set_line_spacing_exact(p)
     run = p.add_run('目录')
-    set_font(run, FONT_HEI, 15, bold=True, color='000000')
+    set_font(run, FONT_HEI, 15, color='000000')
 
     # TOC field code
     toc_p = doc.add_paragraph()
@@ -296,7 +296,7 @@ def add_abstract_section(doc, md_path, is_english=False):
             if line.startswith('**') and line.endswith('**') and '关键词' in line:
                 p = doc.add_paragraph()
                 run = p.add_run(line.replace('**', ''))
-                set_font(run, FONT_HEI, 12, bold=True)
+                set_font(run, FONT_HEI, 12)
                 set_line_spacing_exact(p)
             elif line:
                 cleaned = line.lstrip('　 ')
@@ -387,7 +387,7 @@ def parse_md_body(doc, md_path, body_font_size=12, body_line_spacing=LINE_SPACIN
             p = doc.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             run = p.add_run(cleaned)
-            set_font(run, FONT_HEI, 11, bold=True)
+            set_font(run, FONT_HEI, 11)
             i += 1
             continue
 
