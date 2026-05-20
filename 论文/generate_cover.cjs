@@ -66,7 +66,7 @@ function buildInfoTable() {
     return new TableRow({
       height: { value: 700, rule: "atLeast" },
       children: [
-        // Label cell — 黑体 bold 三号(~16pt)
+        // Label cell — 仿宋 三号，模板要求
         new TableCell({
           width: { size: 2600, type: WidthType.DXA },
           borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE },
@@ -74,7 +74,7 @@ function buildInfoTable() {
           verticalAlign: "center",
           margins: { top: 60, bottom: 60, left: 80, right: 80 },
           children: [new Paragraph({ alignment: AlignmentType.DISTRIBUTE, children: [
-            ...label.split("").map(c => new TextRun({ text: c, size: pt(16), bold: true, font: fontHei }))
+            ...label.split("").map(c => new TextRun({ text: c, size: pt(16), font: fontFang }))
           ]})]
         }),
         // Value cell — Times New Roman 三号，模板要求
