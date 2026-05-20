@@ -512,7 +512,8 @@
     let chartCollapsed = false;
     let isEmergency = false;
     const PAGE_OPEN_TIME = new Date().toISOString();
-    const DEFAULT_MJPEG_URL = "http://192.168.139.183:81/stream";
+    const DEFAULT_MJPEG_URL = "http://192.168.191.183:81/stream";
+    let lastDeviceState = '';
 
     // ── 加载 MP4 文件列表 ─────────────────────────
     fetch('/list_videos').then(r => r.json()).then(d => { videoFiles = d.files; buildUI(); });
@@ -765,27 +766,34 @@
                 const bindRow = document.getElementById('deviceBindRow');
                 const noDevHint = document.getElementById('noDeviceHint');
 
-                if (deviceIds.length === 0) {
-                    bindRow.innerHTML = '';
-                    if (noDevHint) noDevHint.style.display = '';
-                } else {
-                    if (noDevHint) noDevHint.style.display = 'none';
-                    bindRow.innerHTML = deviceIds.map(did => {
-                        const dev = devices[did];
-                        const online = dev.online;
-                        const boundCh = deviceBindings[did] || '';
-                        const color = online ? 'var(--green)' : 'var(--text-dim)';
-                        const label = online ? '●' : '○';
-                        let selOpts = '<option value="">— 解绑 —</option>';
-                        CHANNELS.forEach(ch => {
-                            const sel = boundCh === ch ? ' selected' : '';
-                            selOpts += `<option value="${ch}"${sel}>出口${ch}</option>`;
-                        });
-                        return `<span style="font-size:10px;color:${color};white-space:nowrap;">${label} ${did}</span>
-                            <select onchange="bindDevice('${did}', this.value)" style="font-size:10px;padding:1px 4px;">
-                                ${selOpts}
-                            </select>`;
-                    }).join('');
+                // 仅状态变化时才重建，且用户正在操作下拉框时不打断
+                const currentState = JSON.stringify({ ids: deviceIds, devs: devices, bindings: deviceBindings });
+                const anySelectFocused = bindRow && bindRow.querySelector('select:focus');
+                if (currentState !== lastDeviceState && !anySelectFocused) {
+                    lastDeviceState = currentState;
+
+                    if (deviceIds.length === 0) {
+                        bindRow.innerHTML = '';
+                        if (noDevHint) noDevHint.style.display = '';
+                    } else {
+                        if (noDevHint) noDevHint.style.display = 'none';
+                        bindRow.innerHTML = deviceIds.map(did => {
+                            const dev = devices[did];
+                            const online = dev.online;
+                            const boundCh = deviceBindings[did] || '';
+                            const color = online ? 'var(--green)' : 'var(--text-dim)';
+                            const label = online ? '●' : '○';
+                            let selOpts = '<option value="">— 解绑 —</option>';
+                            CHANNELS.forEach(ch => {
+                                const sel = boundCh === ch ? ' selected' : '';
+                                selOpts += `<option value="${ch}"${sel}>出口${ch}</option>`;
+                            });
+                            return `<span style="font-size:10px;color:${color};white-space:nowrap;">${label} ${did}</span>
+                                <select onchange="bindDevice('${did}', this.value)" style="font-size:10px;padding:1px 4px;">
+                                    ${selOpts}
+                                </select>`;
+                        }).join('');
+                    }
                 }
 
                 // 在线设备计数

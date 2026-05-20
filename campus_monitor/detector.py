@@ -20,7 +20,7 @@ import communication
 from notify import alarm_notify, alarm_clear_notify
 
 # ── 配置 ──────────────────────────────────────────────
-ESP32_CAM_URL = "http://192.168.139.183:81/stream"
+ESP32_CAM_URL = "http://192.168.191.183:81/stream"
 CONFIDENCE_THRESHOLD = 0.5
 PERSON_CLASS_ID = 0
 CHANNELS = ['A', 'B', 'C']
@@ -676,12 +676,6 @@ def detect_loop(channel):
                 cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 cv2.putText(annotated, f"person {conf:.2f}", (x1, y1 - 5),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
-        color = (0, 255, 0) if st['alarm_level'] == 0 else \
-                (0, 215, 255) if st['alarm_level'] == 1 else (0, 0, 255)
-        label = f"[{channel}] {CHANNEL_NAMES[channel]}  Count:{count}  FPS:{st['fps']:.1f}"
-        cv2.putText(annotated, label, (10, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
 
         with lk:
             st['frame'] = annotated
