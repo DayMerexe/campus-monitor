@@ -126,26 +126,30 @@ def set_first_line_indent(para, indent_chars=2, font_size_pt=12):
     ind.set(qn('w:firstLine'), str(font_size_pt * indent_chars * 20))
 
 
-def add_body_para(doc, text, first_indent=True):
-    """Add a body paragraph with template-compliant formatting."""
+def add_body_para(doc, text, first_indent=True, font_size=12, line_spacing=LINE_SPACING_PT, space_before=0):
+    """Add a body paragraph with template-compliant formatting.
+
+    Default: 小四(12pt) 宋体, 行距20磅. For references: 五号(10.5pt), 行距16磅, 段前3磅.
+    """
     p = doc.add_paragraph()
     if first_indent:
-        set_first_line_indent(p)
-    set_line_spacing_exact(p)
-    # Ensure justify alignment
+        set_first_line_indent(p, font_size_pt=font_size)
+    if space_before:
+        p.paragraph_format.space_before = Pt(space_before)
+    set_line_spacing_exact(p, line_pt=line_spacing)
     p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
     run = p.add_run(text)
-    set_font(run, FONT_SONG, 12)
+    set_font(run, FONT_SONG, font_size)
     return p
 
 
 def add_heading_styled(doc, text, level):
     """Add a chapter/section heading matching template specs.
 
-    Template:
-      H1: 黑体 15pt, centered, before=40pt after=20pt
-      H2: 黑体 14pt, left, before=24pt after=6pt
-      H3: 黑体 13pt, left, before=12pt after=6pt
+    Template (per TEXTBOX 17-19):
+      H1: 黑体小三(15pt), centered, before=20pt after=20pt
+      H2: 黑体四号(14pt), left, before=24pt after=6pt
+      H3: 黑体小四(12pt), left, before=12pt after=6pt
     """
     p = doc.add_paragraph()
     p.style = doc.styles[f'Heading {level}']
@@ -153,7 +157,7 @@ def add_heading_styled(doc, text, level):
 
     if level == 1:
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p.paragraph_format.space_before = Pt(40)
+        p.paragraph_format.space_before = Pt(20)
         p.paragraph_format.space_after = Pt(20)
         size = 15
     elif level == 2:
@@ -165,7 +169,7 @@ def add_heading_styled(doc, text, level):
         p.alignment = WD_ALIGN_PARAGRAPH.LEFT
         p.paragraph_format.space_before = Pt(12)
         p.paragraph_format.space_after = Pt(6)
-        size = 13
+        size = 12
 
     run = p.add_run(text)
     set_font(run, FONT_HEI, size, bold=True, color='000000')
@@ -301,8 +305,11 @@ def add_abstract_section(doc, md_path, is_english=False):
     doc.add_page_break()
 
 
-def parse_md_body(doc, md_path):
-    """Parse a markdown chapter file and add to document"""
+def parse_md_body(doc, md_path, body_font_size=12, body_line_spacing=LINE_SPACING_PT, body_space_before=0, body_indent=True):
+    """Parse a markdown chapter file and add to document.
+
+    body_font_size/body_line_spacing overrides for special sections (e.g. 参考文献 10.5pt/16pt).
+    """
     with open(md_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
@@ -375,12 +382,21 @@ def parse_md_body(doc, md_path):
             i += 1
             continue
 
-        # Table/figure captions (like "表2-1 xxx" or "图2-1 xxx")
-        if re.match(r'^(表\d|图\d)', cleaned):
+        # Table captions (like "表2-1 xxx") — 黑体11磅
+        if re.match(r'^表\d', cleaned):
             p = doc.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             run = p.add_run(cleaned)
-            set_font(run, FONT_HEI, 10, bold=True)
+            set_font(run, FONT_HEI, 11, bold=True)
+            i += 1
+            continue
+
+        # Figure captions (like "图2-1 xxx") — 宋体11磅
+        if re.match(r'^图\d', cleaned):
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = p.add_run(cleaned)
+            set_font(run, FONT_SONG, 11)
             i += 1
             continue
 
@@ -395,7 +411,8 @@ def parse_md_body(doc, md_path):
             continue
 
         # Normal body paragraph
-        add_body_para(doc, cleaned)
+        add_body_para(doc, cleaned, first_indent=body_indent, font_size=body_font_size,
+                      line_spacing=body_line_spacing, space_before=body_space_before)
         i += 1
 
     doc.add_page_break()
@@ -503,9 +520,9 @@ def main():
     #    python-docx's high-level API doesn't set eastAsia or color
     # ============================================================
     heading_specs = {
-        1: {'sz': '30', 'before': '800', 'after': '400', 'jc': 'center'},   # 15pt
-        2: {'sz': '28', 'before': '480', 'after': '120', 'jc': 'left'},      # 14pt
-        3: {'sz': '26', 'before': '240', 'after': '120', 'jc': 'left'},      # 13pt
+        1: {'sz': '30', 'before': '400', 'after': '400', 'jc': 'center'},   # 小三 15pt
+        2: {'sz': '28', 'before': '480', 'after': '120', 'jc': 'left'},      # 四号 14pt
+        3: {'sz': '24', 'before': '240', 'after': '120', 'jc': 'left'},      # 小四 12pt
     }
     for level, spec in heading_specs.items():
         hs = doc.styles[f'Heading {level}']
@@ -573,11 +590,12 @@ def main():
         print("Processing: 结论.md")
         parse_md_body(doc, conclusion_path)
 
-    # 参考文献
+    # 参考文献 — 五号(10.5pt), 行距16磅, 段前3磅 (TEXTBOX 36)
     ref_path = os.path.join(BASE, '参考文献.md')
     if os.path.exists(ref_path):
         print("Processing: 参考文献.md")
-        parse_md_body(doc, ref_path)
+        parse_md_body(doc, ref_path, body_font_size=10.5, body_line_spacing=16,
+                      body_space_before=3, body_indent=False)
 
     # 致谢
     thanks_path = os.path.join(BASE, '致谢.md')

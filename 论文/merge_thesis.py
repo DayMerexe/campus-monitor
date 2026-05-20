@@ -196,9 +196,9 @@ def _fix_merged_styles(doc):
 
     # --- Headings ---
     specs = {
-        'Heading1': {'sz': '30', 'before': '800', 'after': '400', 'jc': 'center'},
+        'Heading1': {'sz': '30', 'before': '400', 'after': '400', 'jc': 'center'},
         'Heading2': {'sz': '28', 'before': '480', 'after': '120', 'jc': 'left'},
-        'Heading3': {'sz': '26', 'before': '240', 'after': '120', 'jc': 'left'},
+        'Heading3': {'sz': '24', 'before': '240', 'after': '120', 'jc': 'left'},
     }
     for name, spec in specs.items():
         hs = doc.styles[name]
