@@ -98,16 +98,22 @@ device_bind_lock = threading.Lock()
 
 
 def set_binding(device_id, channel=None):
-    """绑定/解绑设备到通道。channel=None 时解绑。"""
+    """绑定/解绑设备到通道。channel=None 时解绑。
+    同一通道只能绑一个设备（一个出口闸门配一套 STM32）。
+    返回 (ok, error_message)。"""
     global device_bindings
     if channel is not None and channel not in CHANNELS:
-        return False
+        return False, 'invalid channel'
     with device_bind_lock:
         if channel is None:
             device_bindings.pop(device_id, None)
         else:
+            # 检查通道是否已被其他设备绑定
+            for did, ch in device_bindings.items():
+                if ch == channel and did != device_id:
+                    return False, f'通道 {channel} 已绑定 {did}，一个通道只能绑定一个设备'
             device_bindings[device_id] = channel
-    return True
+    return True, None
 
 
 def get_bound_channels():

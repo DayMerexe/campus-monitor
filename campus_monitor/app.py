@@ -235,9 +235,9 @@ def bind_stm32():
     channel = data.get('channel')  # None=解绑
     if channel is not None and channel not in detector.CHANNELS:
         return jsonify({'status': 'error', 'message': 'invalid channel'}), 400
-    ok = detector.set_binding(device_id, channel)
+    ok, err = detector.set_binding(device_id, channel)
     if not ok:
-        return jsonify({'status': 'error', 'message': 'invalid channel'}), 400
+        return jsonify({'status': 'error', 'message': err or 'invalid channel'}), 409
     if channel:
         print(f"[绑定] {device_id} → 通道 {channel}")
     else:

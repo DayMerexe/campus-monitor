@@ -785,8 +785,15 @@
                             const label = online ? '●' : '○';
                             let selOpts = '<option value="">— 解绑 —</option>';
                             CHANNELS.forEach(ch => {
-                                const sel = boundCh === ch ? ' selected' : '';
-                                selOpts += `<option value="${ch}"${sel}>出口${ch}</option>`;
+                                const occupied = Object.entries(deviceBindings).some(
+                                    ([odid, och]) => och === ch && odid !== did
+                                );
+                                if (occupied) {
+                                    selOpts += `<option value="${ch}" disabled>出口${ch} (已占用)</option>`;
+                                } else {
+                                    const sel = boundCh === ch ? ' selected' : '';
+                                    selOpts += `<option value="${ch}"${sel}>出口${ch}</option>`;
+                                }
                             });
                             return `<span style="font-size:10px;color:${color};white-space:nowrap;">${label} ${did}</span>
                                 <select onchange="bindDevice('${did}', this.value)" style="font-size:10px;padding:1px 4px;">
