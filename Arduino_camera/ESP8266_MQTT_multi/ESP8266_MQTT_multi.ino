@@ -30,7 +30,7 @@
 
 // ── 设备标识（烧录时修改此处）───────────────────────
 #define DEVICE_ID "stm32_01"
-// #define DEVICE_ID "stm32_02"   // 第二块板子用
+//#define DEVICE_ID "stm32_02"   // 第二块板子用
 
 const char* ssid = "test";
 const char* password = "wxh708023";
@@ -213,6 +213,8 @@ void loop() {
   client.loop();
 
   // 转发 STM32 发来的数据到 MQTT（火焰传感器状态等）
+  // 50ms 超时防 RX 悬空噪声阻塞主循环
+  Serial.setTimeout(50);
   if (Serial.available()) {
     String line = Serial.readStringUntil('\n');
     line.trim();
