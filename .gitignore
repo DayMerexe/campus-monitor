@@ -48,7 +48,7 @@ data.db
 *.png
 
 # Claude Code
-.claude/settings.local.json
+.claude/
 
 # YOLO 训练（不提交）
 campus_monitor/datasets/
@@ -64,6 +64,25 @@ campus_monitor/notify_fixed.py
 
 # 临时
 Arduino_camera/lingshi/
+
+# 同学项目（不提交）
+刘晖/
+AIxunlian/
+likai/
+侯小宇/
+李奕辰/
+
+# 论文临时
+论文/unpacked_*/
+论文/_tmp_*
+论文/~$*
+论文/正文.docx
+论文/模板_*_preview.txt
+论文/generate_*.py
+论文/node_modules/
+论文/package*.json
+论文/*优秀设计*.pdf
+论文/终稿-标准格式-v2.docx
 
 # OS
 .DS_Store

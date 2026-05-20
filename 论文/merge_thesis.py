@@ -11,6 +11,8 @@ from docx.oxml import OxmlElement
 
 BASE = r"F:\bishe\论文"
 FONT_SONG = "SimSun"
+FONT_HEI = "SimHei"
+LINE_SPACING_PT = 20  # 固定行距 20pt
 
 def set_font(run, name, size_pt, bold=False):
     run.font.size = Pt(size_pt)
@@ -71,8 +73,8 @@ def configure_merged_sections(doc):
 
     Merged document sections:
       0: Cover        — no header/footer
-      1: Title page   — no header/footer
-      2: Declaration  — no header/footer
+      1: Declaration  — no header/footer
+      2: Copyright    — no header/footer
       3: Front matter — no header, Roman page nums
       4: Main body    — header + Arabic page nums from 1
     """
@@ -123,7 +125,112 @@ def configure_merged_sections(doc):
     pgNumType.set(qn('w:start'), '1')
     sectPr.append(pgNumType)
 
+    # Ensure all sections use A4 page size
+    for sec in sections:
+        sectPr = sec._sectPr
+        pgSz = sectPr.find(qn('w:pgSz'))
+        if pgSz is None:
+            pgSz = OxmlElement('w:pgSz')
+            sectPr.insert(0, pgSz)
+        pgSz.set(qn('w:w'), '11906')
+        pgSz.set(qn('w:h'), '16838')
+
     print("Section headers/footers configured.")
+
+
+def _fix_merged_styles(doc):
+    """Fix Normal + Heading 1-3 styles in merged document to match template.
+
+    Called post-merge because the merge process inherits the cover document's
+    default python-docx styles, which don't match the school template.
+    """
+    def _ensure(el, tag):
+        child = el.find(qn('w:' + tag))
+        if child is None:
+            child = OxmlElement('w:' + tag)
+            el.insert(0, child)
+        return child
+
+    def _set_rfonts(rPr, ascii_f, ea_f, hAnsi_f=None):
+        if hAnsi_f is None:
+            hAnsi_f = ascii_f
+        rFonts = _ensure(rPr, 'rFonts')
+        rFonts.set(qn('w:ascii'), ascii_f)
+        rFonts.set(qn('w:eastAsia'), ea_f)
+        rFonts.set(qn('w:hAnsi'), hAnsi_f)
+
+    def _set_color(rPr, hex_color):
+        color = rPr.find(qn('w:color'))
+        if color is None:
+            color = OxmlElement('w:color')
+            rPr.append(color)
+        color.set(qn('w:val'), hex_color)
+
+    # --- Normal (may not exist in docx-js generated cover) ---
+    try:
+        normal = doc.styles['Normal']
+    except KeyError:
+        # Create Normal style by adding to styles element
+        styles_el = doc.styles.element
+        nsmap = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
+        ns = '{' + nsmap + '}'
+        style_el = OxmlElement('w:style')
+        style_el.set(ns + 'type', 'paragraph')
+        style_el.set(ns + 'styleId', 'Normal')
+        style_el.set(ns + 'default', '1')
+        name_el = OxmlElement('w:name')
+        name_el.set(ns + 'val', 'Normal')
+        style_el.append(name_el)
+        styles_el.append(style_el)
+        normal = doc.styles['Normal']
+
+    normal.font.name = FONT_SONG
+    normal.font.size = Pt(12)
+    normal.font.color.rgb = None  # reset
+    normal.paragraph_format.line_spacing = Pt(LINE_SPACING_PT)
+    normal.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    # eastAsia via XML
+    nrPr = _ensure(normal.element, 'rPr')
+    _set_rfonts(nrPr, FONT_SONG, FONT_SONG)
+    _set_color(nrPr, '000000')
+
+    # --- Headings ---
+    specs = {
+        'Heading1': {'sz': '30', 'before': '800', 'after': '400', 'jc': 'center'},
+        'Heading2': {'sz': '28', 'before': '480', 'after': '120', 'jc': 'left'},
+        'Heading3': {'sz': '26', 'before': '240', 'after': '120', 'jc': 'left'},
+    }
+    for name, spec in specs.items():
+        hs = doc.styles[name]
+        hs.font.name = FONT_HEI
+        hs.font.size = Pt(int(spec['sz']) / 2)
+        hs.font.bold = True
+        hs.font.color.rgb = None  # reset (removes blue)
+        hs.paragraph_format.line_spacing = Pt(LINE_SPACING_PT)
+        hs.paragraph_format.space_before = Pt(int(spec['before']) / 20)
+        hs.paragraph_format.space_after = Pt(int(spec['after']) / 20)
+        hs.paragraph_format.alignment = (
+            WD_ALIGN_PARAGRAPH.CENTER if spec['jc'] == 'center'
+            else WD_ALIGN_PARAGRAPH.LEFT
+        )
+        # XML-level fixes
+        hrPr = _ensure(hs.element, 'rPr')
+        _set_rfonts(hrPr, FONT_HEI, FONT_HEI)
+        _set_color(hrPr, '000000')
+        # paragraph properties
+        hpPr = _ensure(hs.element, 'pPr')
+        sp = _ensure(hpPr, 'spacing')
+        sp.set(qn('w:before'), spec['before'])
+        sp.set(qn('w:after'), spec['after'])
+        sp.set(qn('w:line'), str(LINE_SPACING_PT * 20))
+        sp.set(qn('w:lineRule'), 'exact')
+        jc = _ensure(hpPr, 'jc')
+        jc.set(qn('w:val'), spec['jc'])
+        # No first-line indent
+        ind = _ensure(hpPr, 'ind')
+        ind.set(qn('w:firstLine'), '0')
+
+    print("Merged document styles fixed.")
 
 
 # === Main ===
@@ -162,6 +269,7 @@ merged = Document(tmp)
 print(f"Merged sections: {len(merged.sections)}")
 
 configure_merged_sections(merged)
+_fix_merged_styles(merged)
 
 output = r'F:\bishe\论文\终稿-标准格式.docx'
 merged.save(output)

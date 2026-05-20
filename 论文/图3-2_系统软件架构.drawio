@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2026-05-20T00:00:00.000Z" agent="Python" version="24.0.0">
+  <diagram name="Page-1" id="d1">
+    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="950" pageHeight="1050" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="2" value="&lt;b&gt;Web API 层&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8EDF2;strokeColor=#6C8EBF;dashed=1;verticalAlign=top;align=left;spacingLeft=10;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="60" y="20" width="830" height="110" as="geometry"/></mxCell>
+<mxCell id="3" value="&lt;b&gt;检测引擎层&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8EDF2;strokeColor=#6C8EBF;dashed=1;verticalAlign=top;align=left;spacingLeft=10;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="60" y="150" width="830" height="150" as="geometry"/></mxCell>
+<mxCell id="4" value="&lt;b&gt;联动决策层&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8EDF2;strokeColor=#6C8EBF;dashed=1;verticalAlign=top;align=left;spacingLeft=10;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="60" y="320" width="830" height="110" as="geometry"/></mxCell>
+<mxCell id="5" value="&lt;b&gt;通信层&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8EDF2;strokeColor=#6C8EBF;dashed=1;verticalAlign=top;align=left;spacingLeft=10;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="60" y="450" width="830" height="110" as="geometry"/></mxCell>
+<mxCell id="6" value="&lt;b&gt;数据层&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8EDF2;strokeColor=#6C8EBF;dashed=1;verticalAlign=top;align=left;spacingLeft=10;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="60" y="580" width="830" height="120" as="geometry"/></mxCell>
+<mxCell id="7" value="&lt;b&gt;硬件执行层&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8EDF2;strokeColor=#6C8EBF;dashed=1;verticalAlign=top;align=left;spacingLeft=10;fontSize=11;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="60" y="720" width="830" height="120" as="geometry"/></mxCell>
+<mxCell id="8" value="Flask Web Server&lt;br&gt;15个 REST API 路由" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=9;" vertex="1" parent="1"><mxGeometry x="160" y="50" width="250" height="60" as="geometry"/></mxCell>
+<mxCell id="9" value="Jinja2 模板引擎&lt;br&gt;index.html 仪表盘" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=9;" vertex="1" parent="1"><mxGeometry x="530" y="50" width="240" height="60" as="geometry"/></mxCell>
+<mxCell id="10" value="detect_loop A&lt;br&gt;MJPEG/MP4→YOLO→计数" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=9;" vertex="1" parent="1"><mxGeometry x="90" y="185" width="210" height="70" as="geometry"/></mxCell>
+<mxCell id="11" value="detect_loop B&lt;br&gt;MJPEG/MP4→YOLO→计数" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=9;" vertex="1" parent="1"><mxGeometry x="370" y="185" width="210" height="70" as="geometry"/></mxCell>
+<mxCell id="12" value="detect_loop C&lt;br&gt;MJPEG/MP4→YOLO→计数" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=9;" vertex="1" parent="1"><mxGeometry x="650" y="185" width="210" height="70" as="geometry"/></mxCell>
+<mxCell id="13" value="相位错开启动: A=0ms, B=16.7ms, C=33.3ms" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;" vertex="1" parent="1"><mxGeometry x="330" y="265" width="290" height="20" as="geometry"/></mxCell>
+<mxCell id="14" value="coordinated_decision()&lt;br&gt;饱和度快照 → 四策略判定 → 每设备指令生成" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=9;" vertex="1" parent="1"><mxGeometry x="110" y="345" width="440" height="60" as="geometry"/></mxCell>
+<mxCell id="15" value="对称防抖引擎&lt;br&gt;3帧确认 + 3秒锁定&lt;br&gt;阈值抖动消除" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=9;" vertex="1" parent="1"><mxGeometry x="640" y="345" width="200" height="60" as="geometry"/></mxCell>
+<mxCell id="16" value="mqtt_send_to() + broadcast()&lt;br&gt;MQTT 指令定向下发" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=9;" vertex="1" parent="1"><mxGeometry x="90" y="480" width="250" height="50" as="geometry"/></mxCell>
+<mxCell id="17" value="on_mqtt_message()&lt;br&gt;通配符回调&lt;br&gt;设备自动发现" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=9;" vertex="1" parent="1"><mxGeometry x="390" y="480" width="200" height="55" as="geometry"/></mxCell>
+<mxCell id="18" value="alarm_notify()&lt;br&gt;钉钉机器人&lt;br&gt;报警推送" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=9;" vertex="1" parent="1"><mxGeometry x="670" y="480" width="160" height="55" as="geometry"/></mxCell>
+<mxCell id="19" value="SQLite (campus_monitor/)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=9;" vertex="1" parent="1"><mxGeometry x="280" y="600" width="390" height="22" as="geometry"/></mxCell>
+<mxCell id="20" value="detection_records 检测记录（时序）" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=9;" vertex="1" parent="1"><mxGeometry x="180" y="635" width="195" height="45" as="geometry"/></mxCell>
+<mxCell id="21" value="alarm_events 报警事件（生命周期）" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=12;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=9;" vertex="1" parent="1"><mxGeometry x="520" y="635" width="220" height="45" as="geometry"/></mxCell>
+<mxCell id="22" value="STM32 固件&lt;br&gt;servo_tick() 非阻塞状态机&lt;br&gt;火焰3帧防抖 / UART解析" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=9;" vertex="1" parent="1"><mxGeometry x="90" y="750" width="240" height="65" as="geometry"/></mxCell>
+<mxCell id="23" value="ESP8266 固件&lt;br&gt;MQTT+LWT遗嘱&lt;br&gt;双向串口透传" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=9;" vertex="1" parent="1"><mxGeometry x="385" y="750" width="200" height="65" as="geometry"/></mxCell>
+<mxCell id="24" value="ESP32-CAM 固件&lt;br&gt;MJPEG HTTP 视频推流" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=9;" vertex="1" parent="1"><mxGeometry x="640" y="750" width="170" height="65" as="geometry"/></mxCell>
+<mxCell id="25" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=9;" edge="1" parent="1" source="8" target="11"><mxGeometry relative="1" as="geometry"/></mxCell>
+<mxCell id="26" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=9;strokeWidth=2;" edge="1" parent="1" source="11" target="14"><mxGeometry relative="1" as="geometry"/></mxCell>
+<mxCell id="27" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=9;strokeWidth=2;" edge="1" parent="1" source="14" target="16"><mxGeometry relative="1" as="geometry"/></mxCell>
+<mxCell id="28" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=9;" edge="1" parent="1" source="16" target="17"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

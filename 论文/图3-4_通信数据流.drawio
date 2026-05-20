@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2026-05-20T00:00:00.000Z" agent="Python" version="24.0.0">
+  <diagram name="Page-1" id="d1">
+    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="800" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="2" value="&lt;b&gt;ESP32-CAM&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=9;" vertex="1" parent="1"><mxGeometry x="50" y="15" width="100" height="35" as="geometry"/></mxCell>
+<mxCell id="3" value="&lt;b&gt;PC&lt;br&gt;(YOLO+决策)&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=9;" vertex="1" parent="1"><mxGeometry x="230" y="15" width="100" height="35" as="geometry"/></mxCell>
+<mxCell id="4" value="&lt;b&gt;MQTT Broker&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=9;" vertex="1" parent="1"><mxGeometry x="450" y="15" width="100" height="35" as="geometry"/></mxCell>
+<mxCell id="5" value="&lt;b&gt;ESP8266&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=9;" vertex="1" parent="1"><mxGeometry x="670" y="15" width="100" height="35" as="geometry"/></mxCell>
+<mxCell id="6" value="&lt;b&gt;STM32&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=9;" vertex="1" parent="1"><mxGeometry x="850" y="15" width="100" height="35" as="geometry"/></mxCell>
+<mxCell id="7" value="&lt;b&gt;火焰传感器&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=9;" vertex="1" parent="1"><mxGeometry x="1000" y="15" width="100" height="35" as="geometry"/></mxCell>
+<mxCell id="8" value="" style="line;strokeWidth=1;html=1;dashed=1;" vertex="1" parent="1"><mxGeometry x="100" y="55" width="0" height="730" as="geometry"/></mxCell>
+<mxCell id="9" value="" style="line;strokeWidth=1;html=1;dashed=1;" vertex="1" parent="1"><mxGeometry x="280" y="55" width="0" height="730" as="geometry"/></mxCell>
+<mxCell id="10" value="" style="line;strokeWidth=1;html=1;dashed=1;" vertex="1" parent="1"><mxGeometry x="500" y="55" width="0" height="730" as="geometry"/></mxCell>
+<mxCell id="11" value="" style="line;strokeWidth=1;html=1;dashed=1;" vertex="1" parent="1"><mxGeometry x="720" y="55" width="0" height="730" as="geometry"/></mxCell>
+<mxCell id="12" value="" style="line;strokeWidth=1;html=1;dashed=1;" vertex="1" parent="1"><mxGeometry x="900" y="55" width="0" height="730" as="geometry"/></mxCell>
+<mxCell id="13" value="" style="line;strokeWidth=1;html=1;dashed=1;" vertex="1" parent="1"><mxGeometry x="1050" y="55" width="0" height="730" as="geometry"/></mxCell>
+<mxCell id="14" value="" style="line;strokeWidth=1;html=1;dashed=1;" vertex="1" parent="1"><mxGeometry x="30" y="330" width="1030" height="0" as="geometry"/></mxCell>
+<mxCell id="15" value="" style="line;strokeWidth=1;html=1;dashed=1;" vertex="1" parent="1"><mxGeometry x="30" y="560" width="1030" height="0" as="geometry"/></mxCell>
+<mxCell id="16" value="&lt;b&gt;下行链路 (AI检测→执行)&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="15" y="65" width="170" height="18" as="geometry"/></mxCell>
+<mxCell id="17" value="&lt;b&gt;上行链路 (传感器→决策)&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="15" y="340" width="170" height="18" as="geometry"/></mxCell>
+<mxCell id="18" value="&lt;b&gt;遗嘱消息 (LWT)&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#CC0000;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="15" y="570" width="170" height="18" as="geometry"/></mxCell>
+<mxCell id="19" value="HTTP MJPEG 持续推流" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=9;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="100" y="95" as="sourcePoint"/><mxPoint x="280" y="95" as="targetPoint"/></mxGeometry></mxCell>
+<mxCell id="20" value="YOLOv8 推理 + 联动决策" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;" vertex="1" parent="1"><mxGeometry x="235" y="130" width="90" height="30" as="geometry"/></mxCell>
+<mxCell id="21" value="Publish alarm Topic&lt;br&gt;LV:2,BUZ:1,SERVO:1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=9;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="280" y="170" as="sourcePoint"/><mxPoint x="500" y="170" as="targetPoint"/></mxGeometry></mxCell>
+<mxCell id="22" value="Subscribe 转发" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=9;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="500" y="202" as="sourcePoint"/><mxPoint x="720" y="202" as="targetPoint"/></mxGeometry></mxCell>
+<mxCell id="23" value="USART2 TX" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=9;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="720" y="234" as="sourcePoint"/><mxPoint x="900" y="234" as="targetPoint"/></mxGeometry></mxCell>
+<mxCell id="24" value="sscanf 解析 → LED / 蜂鸣器 / 舵机" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;" vertex="1" parent="1"><mxGeometry x="820" y="266" width="160" height="18" as="geometry"/></mxCell>
+<mxCell id="25" value="&lt;b&gt;GPIO PA0 低电平=火焰&lt;/b&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=9;strokeColor=#CC0000;strokeWidth=2;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="1050" y="365" as="sourcePoint"/><mxPoint x="900" y="365" as="targetPoint"/></mxGeometry></mxCell>
+<mxCell id="26" value="3帧防抖" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;" vertex="1" parent="1"><mxGeometry x="870" y="380" width="60" height="18" as="geometry"/></mxCell>
+<mxCell id="27" value="USART2 RX FLAME:1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=9;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="900" y="405" as="sourcePoint"/><mxPoint x="720" y="405" as="targetPoint"/></mxGeometry></mxCell>
+<mxCell id="28" value="Publish flame Topic" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=9;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="720" y="437" as="sourcePoint"/><mxPoint x="500" y="437" as="targetPoint"/></mxGeometry></mxCell>
+<mxCell id="29" value="Subscribe 回调 更新火焰状态" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=9;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="500" y="469" as="sourcePoint"/><mxPoint x="280" y="469" as="targetPoint"/></mxGeometry></mxCell>
+<mxCell id="30" value="触发联动决策" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;" vertex="1" parent="1"><mxGeometry x="235" y="509" width="90" height="18" as="geometry"/></mxCell>
+<mxCell id="31" value="Connect + LWT=offline" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=9;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="500" y="595" as="sourcePoint"/><mxPoint x="720" y="595" as="targetPoint"/></mxGeometry></mxCell>
+<mxCell id="32" value="&lt;b&gt;··· ESP8266 异常断线 ···&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#CC0000;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="650" y="630" width="140" height="18" as="geometry"/></mxCell>
+<mxCell id="33" value="Broker 自动发布遗嘱 status=offline" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontSize=9;" edge="1" parent="1"><mxGeometry relative="1" as="geometry"><mxPoint x="500" y="665" as="sourcePoint"/><mxPoint x="280" y="665" as="targetPoint"/></mxGeometry></mxCell>
+<mxCell id="34" value="PC 标记设备离线 排除出联动决策" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;" vertex="1" parent="1"><mxGeometry x="215" y="705" width="130" height="25" as="geometry"/></mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
