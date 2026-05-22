@@ -1,22 +1,29 @@
 # 二进制/大文件
-*.jpg
-*.png
 *.pptx
 *.zip
+*.7z
+*.rar
 *.bin
 *.hex
 *.axf
+*.o
+*.d
+*.crf
+*.dep
+*.pt
+*.pth
 
-# 不需要扫描的目录
-Arduino_camera/
-output/
-ppt-slides/
-docs/
-stm32_breath_led/
-stm32_firmware/
-esp8266_bridge/
-likai/
+# 编译产物
+**/build/
+**/Listings/
+**/Objects/
+**/__pycache__/
 
-# 大文件
-stm32_serial_led.zip
-中期答辩.pptx
+# 数据库
+data.db
+
+# 同学项目
+侯小宇/
+
+# 模型训练中间产物
+campus_monitor/runs/
