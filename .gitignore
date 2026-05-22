@@ -43,10 +43,6 @@ data.db
 *.rar
 *.exe
 
-# Images (screenshots)
-*.jpg
-*.png
-
 # Claude Code
 .claude/
 
@@ -71,6 +67,7 @@ AIxunlian/
 likai/
 侯小宇/
 李奕辰/
+王晓辉/
 
 # 论文临时
 论文/unpacked_*/
@@ -82,7 +79,8 @@ likai/
 论文/node_modules/
 论文/package*.json
 论文/*优秀设计*.pdf
-
+论文/降重版.docx
+论文/流程图自做/王晓辉.docx
 
 # OS
 .DS_Store

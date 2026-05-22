@@ -1,2 +1,0 @@
-claude --resume bd0acc0e-2550-4d76-8678-06d4b9363c04毕设项目
-claude --resume 2e201a74-7c55-466f-ba3b-d688d66d4484Claude学习
