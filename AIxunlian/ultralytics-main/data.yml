@@ -1,7 +1,0 @@
-# 把路径改成你自己的实际路径，复制报错里的正确部分即可
-path: C:\Users\99257\Desktop\ultralytics-main\datasets\bvn
-train: images/train
-val: images/val
-
-nc: 1
-names: ['crack']
